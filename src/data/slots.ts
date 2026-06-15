@@ -13,6 +13,19 @@ export const ROLE_LABEL: Record<Role, string> = {
   fullback: "Fullback",
 };
 
+export const ROLE_ORDER: Record<Role, number> = {
+  prop: 0,
+  hooker: 1,
+  lock: 2,
+  flanker: 3,
+  number8: 4,
+  scrumhalf: 5,
+  flyhalf: 6,
+  centre: 7,
+  wing: 8,
+  fullback: 9,
+};
+
 export function positionLabel(p: Player): string {
   const base = ROLE_LABEL[p.role];
   if (p.alt?.length) return `${base} / ${ROLE_LABEL[p.alt[0]]}`;

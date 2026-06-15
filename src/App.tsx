@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import "./index.css";
 import type { Lineup, Player, SlotId, Squad, TournamentResult } from "./types";
-import { positionLabel } from "./data/slots";
+import { positionLabel, ROLE_ORDER } from "./data/slots";
 import { SQUADS } from "./data/squads";
 import {
   applyMove,
@@ -360,7 +360,8 @@ export default function App() {
                     a.ok !== b.ok
                       ? Number(b.ok) - Number(a.ok)
                       : hideRatings
-                        ? a.p.name.localeCompare(b.p.name)
+                        ? ROLE_ORDER[a.p.role] - ROLE_ORDER[b.p.role] ||
+                          a.p.name.localeCompare(b.p.name)
                         : b.p.ovr - a.p.ovr,
                   )
                   .map(({ p, ok }) => (

@@ -1,8 +1,9 @@
 name: Deploy to GitHub Pages
 
+# Manual-only: we currently host on Vercel (private repo). This stays here so
+# we can switch to GitHub Pages later by flipping the repo public and running
+# this workflow. Re-add the `push` trigger then.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
