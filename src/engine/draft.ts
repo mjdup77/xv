@@ -57,15 +57,18 @@ export function applyMove(from: SlotId, to: SlotId, lineup: Lineup): Lineup {
 }
 
 // Pre-roll a deterministic sequence of squads for a seed.
-export function buildSpinSequence(seed: string, length = 60): Squad[] {
+export function buildSpinSequence(seed: string, length = 60, minYear = 0): Squad[] {
   const rng = new Rng(seed + ":spins");
+  // Restrict to the selected era, falling back to all squads if the filter is empty.
+  const filtered = SQUADS.filter((s) => s.year >= minYear);
+  const pool = filtered.length > 0 ? filtered : SQUADS;
   const out: Squad[] = [];
   let last = "";
   for (let i = 0; i < length; i++) {
-    let s = rng.pick(SQUADS);
+    let s = rng.pick(pool);
     // Avoid immediate repeats for variety.
     let guard = 0;
-    while (s.id === last && guard++ < 5) s = rng.pick(SQUADS);
+    while (s.id === last && guard++ < 5) s = rng.pick(pool);
     last = s.id;
     out.push(s);
   }

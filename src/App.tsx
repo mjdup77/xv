@@ -28,6 +28,13 @@ const DIFFICULTY = {
 } as const;
 type Diff = keyof typeof DIFFICULTY;
 
+const ERA = {
+  all: { label: "All-time", minYear: 0 },
+  m2000: { label: "2000s+", minYear: 2000 },
+  m2010: { label: "2010s+", minYear: 2010 },
+} as const;
+type Era = keyof typeof ERA;
+
 function todaySeed(): string {
   return "daily-" + new Date().toISOString().slice(0, 10);
 }
@@ -49,6 +56,7 @@ export default function App() {
   const [movingSlot, setMovingSlot] = useState<SlotId | null>(null);
   const [respinsLeft, setRespinsLeft] = useState(3);
   const [difficulty, setDifficulty] = useState<Diff>("medium");
+  const [era, setEra] = useState<Era>("all");
   const [hideRatings, setHideRatings] = useState(false);
   const [result, setResult] = useState<TournamentResult | null>(null);
   const animRef = useRef<number | null>(null);
@@ -63,7 +71,7 @@ export default function App() {
       const cfg = DIFFICULTY[difficulty];
       const s = daily ? todaySeed() : randomSeed();
       setSeed(s);
-      setSpins(buildSpinSequence(s));
+      setSpins(buildSpinSequence(s, 60, ERA[era].minYear));
       setSpinIndex(0);
       setLineup({});
       setPickedIds(new Set());
@@ -76,7 +84,7 @@ export default function App() {
       setResult(null);
       setPhase("draft");
     },
-    [difficulty],
+    [difficulty, era],
   );
 
   const landSquad = useCallback(
@@ -227,6 +235,25 @@ export default function App() {
               ))}
             </div>
             <span className="difficulty-blurb">{DIFFICULTY[difficulty].blurb}</span>
+          </div>
+          <div className="difficulty">
+            <span className="difficulty-label">Era</span>
+            <div className="seg">
+              {(Object.keys(ERA) as Era[]).map((e) => (
+                <button
+                  key={e}
+                  className={`seg-btn ${era === e ? "active" : ""}`}
+                  onClick={() => setEra(e)}
+                >
+                  {ERA[e].label}
+                </button>
+              ))}
+            </div>
+            <span className="difficulty-blurb">
+              {era === "all"
+                ? "Every World Cup, 1987–present"
+                : `Only squads from ${ERA[era].minYear} onward`}
+            </span>
           </div>
           <div className="home-actions">
             <button className="btn primary big" onClick={() => startRun(false)}>

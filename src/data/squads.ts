@@ -1,4 +1,9 @@
 import type { Attr, Player, Role, Squad } from "../types";
+import { WC_1987_1991 } from "./wc/group1987_1991";
+import { WC_1995_1999 } from "./wc/group1995_1999";
+import { WC_2003_2007 } from "./wc/group2003_2007";
+import { WC_2011_2015 } from "./wc/group2011_2015";
+import { WC_2019_2023 } from "./wc/group2019_2023";
 
 // Authoring helpers. Each player: name, role, overall, optional alt roles,
 // and optional signature attribute overrides (absolute values 1..99).
@@ -222,6 +227,11 @@ export const SQUADS: Squad[] = [
     { n: "Chester Williams", r: "wing", o: 85, s: { pace: 89 } },
     { n: "André Joubert", r: "fullback", o: 86, s: { handling: 88, goalKick: 82 } },
   ]),
+  ...WC_1987_1991,
+  ...WC_1995_1999,
+  ...WC_2003_2007,
+  ...WC_2011_2015,
+  ...WC_2019_2023,
 ];
 
 export const ALL_PLAYERS: Player[] = SQUADS.flatMap((s) => s.players);
