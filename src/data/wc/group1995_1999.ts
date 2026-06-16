@@ -68,6 +68,7 @@ export const WC_1995_1999: Squad[] = [
     { n: "Fabien Galthié", r: "scrumhalf", o: 86 },
     { n: "Christophe Lamaison", r: "flyhalf", o: 85, s: { goalKick: 91 } },
     { n: "Richard Dourthe", r: "centre", o: 84 },
+    { n: "Stéphane Glas", r: "centre", o: 81 },
     { n: "Émile Ntamack", r: "fullback", o: 85, alt: ["wing"] },
     { n: "Christophe Dominici", r: "wing", o: 85, s: { pace: 91 } },
     { n: "Philippe Bernat-Salles", r: "wing", o: 83 },
