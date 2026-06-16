@@ -23,11 +23,11 @@ const ROUNDS: RoundCfg[] = [
     { name: "Japan", flag: "🇯🇵" }, { name: "Fiji", flag: "🇫🇯" }, { name: "Italy", flag: "🇮🇹" } ] },
   { round: "Pool Match 4", rating: 83, swing: 5.5, pool: [
     { name: "Scotland", flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" }, { name: "Argentina", flag: "🇦🇷" }, { name: "Wales", flag: "🏴󠁧󠁢󠁷󠁬󠁳󠁿" } ] },
-  { round: "Quarter-final", rating: 86, swing: 6, pool: [
+  { round: "Quarter-final", rating: 88, swing: 4.5, pool: [
     { name: "Australia", flag: "🇦🇺" }, { name: "Argentina", flag: "🇦🇷" }, { name: "Ireland", flag: "☘️" } ] },
-  { round: "Semi-final", rating: 88, swing: 6.5, pool: [
+  { round: "Semi-final", rating: 90, swing: 5, pool: [
     { name: "England", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { name: "France", flag: "🇫🇷" }, { name: "Ireland", flag: "☘️" } ] },
-  { round: "Final", rating: 91, swing: 7, pool: [
+  { round: "Final", rating: 92, swing: 5.5, pool: [
     { name: "New Zealand", flag: "🇳🇿" }, { name: "South Africa", flag: "🇿🇦" } ] },
 ];
 
@@ -80,7 +80,7 @@ function simMatch(
 
   // 1) Tries — the foundation everything else is built on. The steeper slope
   //    means a big quality gap produces a genuine blow-out vs weak teams.
-  let tries = Math.round((attack - R) * 0.155 + 1.6 + rng.normal(0, 1.0));
+  let tries = Math.round((attack - R) * 0.17 + 1.6 + rng.normal(0, 1.0));
   tries = Math.max(0, Math.min(11, tries));
   let triesAg = Math.round((R - defence) * 0.11 + 1.7 + rng.normal(0, 0.9));
   triesAg = Math.max(0, Math.min(9, triesAg));
