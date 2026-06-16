@@ -1,6 +1,9 @@
+import { useState } from "react";
 import type { Lineup, TournamentResult } from "../types";
 import { Pitch } from "./Pitch";
 import { track } from "../analytics";
+
+const SHARE_URL = "https://xv-7-0.vercel.app/";
 
 interface Props {
   result: TournamentResult;
@@ -22,7 +25,7 @@ function FacetBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function Result({ result, lineup, seed, onPlayAgain }: Props) {
+export function Result({ result, lineup, onPlayAgain }: Props) {
   const klass = result.perfect35
     ? "perfect"
     : result.champion
@@ -37,20 +40,40 @@ export function Result({ result, lineup, seed, onPlayAgain }: Props) {
       ? "Chasing the Perfect 35"
       : "Where it slipped";
 
-  const share = () => {
+  const [shared, setShared] = useState(false);
+
+  const share = async () => {
     const line = result.perfect35
       ? `I built the PERFECT 35 on XV 🏆 — bonus-point wins in all 7 games to win the World Cup.`
       : result.champion
         ? `I won the Rugby World Cup on XV 🏆 (Perfect score ${result.perfectScore}/35).`
         : `${result.verdict} on XV. My run scored ${result.perfectScore}/35. Can you go all the way?`;
-    const text = `${line}\nPlay: https://xv.app  (seed ${seed})`;
-    navigator.clipboard?.writeText(text);
+    const text = `${line}\nPlay: ${SHARE_URL}`;
+
+    const canNativeShare =
+      typeof navigator !== "undefined" && typeof navigator.share === "function";
     track("share_clicked", {
-      method: "copy",
+      method: canNativeShare ? "native" : "copy",
       champion: result.champion,
       perfect35: result.perfect35,
       perfect_score: result.perfectScore,
     });
+
+    try {
+      if (canNativeShare) {
+        await navigator.share({ title: "XV", text: line, url: SHARE_URL });
+        return;
+      }
+    } catch {
+      // User dismissed the share sheet, or it failed — fall back to copy.
+    }
+    try {
+      await navigator.clipboard?.writeText(text);
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
   };
 
   return (
@@ -181,7 +204,7 @@ export function Result({ result, lineup, seed, onPlayAgain }: Props) {
           New Run
         </button>
         <button className="btn ghost" onClick={share}>
-          Copy Challenge
+          {shared ? "Copied!" : "Share Result"}
         </button>
       </div>
     </div>
