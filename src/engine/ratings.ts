@@ -30,6 +30,33 @@ const PROFILES: Record<Role, Partial<Record<Attr, number>>> = {
 
 const clamp = (n: number) => Math.max(1, Math.min(99, Math.round(n)));
 
+export interface Tag {
+  icon: string;
+  label: string;
+}
+
+// Up to two signature traits per player, derived from their attributes. Only
+// genuinely standout traits qualify, so most players get 0-2 and the truly
+// elite get the punchiest badges.
+export function signatureTags(p: Player): Tag[] {
+  const a = getAttrs(p);
+  const cands: { tag: Tag; v: number; min: number }[] = [
+    { tag: { icon: "🎯", label: "Goal-kicker" }, v: a.goalKick, min: 84 },
+    { tag: { icon: "⚡", label: "Strike runner" }, v: a.pace, min: 89 },
+    { tag: { icon: "🎩", label: "Playmaker" }, v: a.gameManage, min: 87 },
+    { tag: { icon: "🧱", label: "Enforcer" }, v: a.defence, min: 90 },
+    { tag: { icon: "💪", label: "Ball carrier" }, v: a.carry, min: 89 },
+    { tag: { icon: "🪝", label: "Jackal" }, v: a.breakdown, min: 89 },
+    { tag: { icon: "🏛️", label: "Set-piece rock" }, v: a.setPiece, min: 90 },
+    { tag: { icon: "🧤", label: "Distributor" }, v: a.handling, min: 90 },
+  ];
+  return cands
+    .filter((c) => c.v >= c.min)
+    .sort((x, y) => y.v - y.min - (x.v - x.min))
+    .slice(0, 2)
+    .map((c) => c.tag);
+}
+
 export function getAttrs(p: Player): Record<Attr, number> {
   const prof = PROFILES[p.role];
   const out = {} as Record<Attr, number>;

@@ -19,7 +19,7 @@ import {
   playerKey,
   squadHasPick,
 } from "./engine/draft";
-import { computeFacets } from "./engine/ratings";
+import { computeFacets, signatureTags } from "./engine/ratings";
 import { StrengthPanel } from "./components/StrengthPanel";
 import { simulate } from "./engine/sim";
 import { Pitch } from "./components/Pitch";
@@ -519,7 +519,18 @@ export default function App() {
                         disabled={!ok}
                       >
                         {!hideRatings && <span className="pr-ovr">{p.ovr}</span>}
-                        <span className="pr-name">{p.name}</span>
+                        <span className="pr-mid">
+                          <span className="pr-name">{p.name}</span>
+                          {signatureTags(p).length > 0 && (
+                            <span className="pr-tags">
+                              {signatureTags(p).map((t) => (
+                                <span className="pr-tag" key={t.label} title={t.label}>
+                                  {t.icon} {t.label}
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                        </span>
                         <span className="pr-pos">
                           {pickedKeys.has(playerKey(p)) ? "picked" : positionLabel(p)}
                         </span>
