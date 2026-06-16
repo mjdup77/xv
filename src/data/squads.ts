@@ -4,6 +4,11 @@ import { WC_1995_1999 } from "./wc/group1995_1999";
 import { WC_2003_2007 } from "./wc/group2003_2007";
 import { WC_2011_2015 } from "./wc/group2011_2015";
 import { WC_2019_2023 } from "./wc/group2019_2023";
+import { GAP_AUSTRALIA } from "./wc/gapAustralia";
+import { GAP_FRANCE_ENGLAND } from "./wc/gapFranceEngland";
+import { GAP_WALES } from "./wc/gapWales";
+import { GAP_IRELAND } from "./wc/gapIreland";
+import { GAP_SCOT_JPN_ARG } from "./wc/gapScotJpnArg";
 
 // Authoring helpers. Each player: name, role, overall, optional alt roles,
 // and optional signature attribute overrides (absolute values 1..99).
@@ -232,6 +237,11 @@ export const SQUADS: Squad[] = [
   ...WC_2003_2007,
   ...WC_2011_2015,
   ...WC_2019_2023,
+  ...GAP_AUSTRALIA,
+  ...GAP_FRANCE_ENGLAND,
+  ...GAP_WALES,
+  ...GAP_IRELAND,
+  ...GAP_SCOT_JPN_ARG,
 ];
 
 export const ALL_PLAYERS: Player[] = SQUADS.flatMap((s) => s.players);
