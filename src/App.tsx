@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import "./index.css";
 import type { Lineup, Player, SlotId, Squad, TournamentResult } from "./types";
 import { positionLabel, ROLE_ORDER } from "./data/slots";
-import { SQUADS } from "./data/squads";
+import { SQUADS, applyRatingMode, type RatingMode } from "./data/squads";
 import {
   applyMove,
   buildSpinSequence,
@@ -35,6 +35,17 @@ const ERA = {
 } as const;
 type Era = keyof typeof ERA;
 
+const RATING = {
+  seasonal: {
+    label: "Seasonal",
+    blurb: "Players rated at that World Cup (Habana '07 ≠ '15)",
+  },
+  prime: {
+    label: "Prime",
+    blurb: "Every player at their career peak",
+  },
+} as const satisfies Record<RatingMode, { label: string; blurb: string }>;
+
 function todaySeed(): string {
   return "daily-" + new Date().toISOString().slice(0, 10);
 }
@@ -57,6 +68,7 @@ export default function App() {
   const [respinsLeft, setRespinsLeft] = useState(3);
   const [difficulty, setDifficulty] = useState<Diff>("medium");
   const [era, setEra] = useState<Era>("all");
+  const [ratingMode, setRatingMode] = useState<RatingMode>("seasonal");
   const [hideRatings, setHideRatings] = useState(false);
   const [result, setResult] = useState<TournamentResult | null>(null);
   const animRef = useRef<number | null>(null);
@@ -71,7 +83,7 @@ export default function App() {
       const cfg = DIFFICULTY[difficulty];
       const s = daily ? todaySeed() : randomSeed();
       setSeed(s);
-      setSpins(buildSpinSequence(s, 60, ERA[era].minYear));
+      setSpins(buildSpinSequence(s, 60, ERA[era].minYear, ratingMode));
       setSpinIndex(0);
       setLineup({});
       setPickedIds(new Set());
@@ -84,7 +96,7 @@ export default function App() {
       setResult(null);
       setPhase("draft");
     },
-    [difficulty, era],
+    [difficulty, era, ratingMode],
   );
 
   const landSquad = useCallback(
@@ -96,11 +108,11 @@ export default function App() {
           return;
         }
       }
-      // Fallback: any usable squad in the dataset.
+      // Fallback: any usable squad in the dataset (respecting rating mode).
       const any = SQUADS.find((sq) => squadHasPick(sq, curLineup, curPicked));
-      setCurrentSquad(any ?? null);
+      setCurrentSquad(any ? applyRatingMode(any, ratingMode) : null);
     },
-    [spins],
+    [spins, ratingMode],
   );
 
   const doSpin = useCallback(() => {
@@ -254,6 +266,21 @@ export default function App() {
                 ? "Every World Cup, 1987–present"
                 : `Only squads from ${ERA[era].minYear} onward`}
             </span>
+          </div>
+          <div className="difficulty">
+            <span className="difficulty-label">Ratings</span>
+            <div className="seg">
+              {(Object.keys(RATING) as RatingMode[]).map((r) => (
+                <button
+                  key={r}
+                  className={`seg-btn ${ratingMode === r ? "active" : ""}`}
+                  onClick={() => setRatingMode(r)}
+                >
+                  {RATING[r].label}
+                </button>
+              ))}
+            </div>
+            <span className="difficulty-blurb">{RATING[ratingMode].blurb}</span>
           </div>
           <div className="home-actions">
             <button className="btn primary big" onClick={() => startRun(false)}>

@@ -1,6 +1,6 @@
 import type { Lineup, Player, SlotId, Squad } from "../types";
 import { SLOTS, eligibleSlots } from "../data/slots";
-import { SQUADS } from "../data/squads";
+import { SQUADS, applyRatingMode, type RatingMode } from "../data/squads";
 import { Rng } from "./rng";
 
 export function rolesOf(p: Player): string[] {
@@ -57,11 +57,17 @@ export function applyMove(from: SlotId, to: SlotId, lineup: Lineup): Lineup {
 }
 
 // Pre-roll a deterministic sequence of squads for a seed.
-export function buildSpinSequence(seed: string, length = 60, minYear = 0): Squad[] {
+export function buildSpinSequence(
+  seed: string,
+  length = 60,
+  minYear = 0,
+  ratingMode: RatingMode = "seasonal",
+): Squad[] {
   const rng = new Rng(seed + ":spins");
   // Restrict to the selected era, falling back to all squads if the filter is empty.
   const filtered = SQUADS.filter((s) => s.year >= minYear);
-  const pool = filtered.length > 0 ? filtered : SQUADS;
+  const base = filtered.length > 0 ? filtered : SQUADS;
+  const pool = base.map((s) => applyRatingMode(s, ratingMode));
   const out: Squad[] = [];
   let last = "";
   for (let i = 0; i < length; i++) {

@@ -235,3 +235,31 @@ export const SQUADS: Squad[] = [
 ];
 
 export const ALL_PLAYERS: Player[] = SQUADS.flatMap((s) => s.players);
+
+// ---- Rating mode: seasonal (as authored) vs prime (career-peak) ----
+export type RatingMode = "seasonal" | "prime";
+
+type PrimeInfo = { ovr: number; overrides?: Player["overrides"] };
+
+// A player's "prime" = their best World Cup season across all appearances.
+const PRIME_BY_NAME: Map<string, PrimeInfo> = (() => {
+  const m = new Map<string, PrimeInfo>();
+  for (const p of ALL_PLAYERS) {
+    const cur = m.get(p.name);
+    if (!cur || p.ovr > cur.ovr) m.set(p.name, { ovr: p.ovr, overrides: p.overrides });
+  }
+  return m;
+})();
+
+// Return the player rated at their career peak. Identity (id, year, role) is
+// preserved — only the rating and signature attributes lift to their best.
+export function primeOf(p: Player): Player {
+  const best = PRIME_BY_NAME.get(p.name);
+  if (!best || best.ovr <= p.ovr) return p;
+  return { ...p, ovr: best.ovr, overrides: best.overrides };
+}
+
+export function applyRatingMode(sq: Squad, mode: RatingMode): Squad {
+  if (mode === "seasonal") return sq;
+  return { ...sq, players: sq.players.map(primeOf) };
+}
