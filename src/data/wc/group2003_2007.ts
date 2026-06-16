@@ -134,6 +134,7 @@ export const WC_2003_2007: Squad[] = [
     { n: "Nicolas Mas", r: "prop", o: 82 },
     { n: "Fabien Pelous", r: "lock", o: 85 },
     { n: "Jérôme Thion", r: "lock", o: 82 },
+    { n: "Sébastien Chabal", r: "lock", o: 84, alt: ["number8"], s: { carry: 89 } },
     { n: "Thierry Dusautoir", r: "flanker", o: 86, s: { defence: 91 } },
     { n: "Serge Betsen", r: "flanker", o: 85, s: { breakdown: 88 } },
     { n: "Imanol Harinordoquy", r: "number8", o: 85 },

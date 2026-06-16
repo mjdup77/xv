@@ -10,7 +10,7 @@ export const WC_1995_1999: Squad[] = [
     { n: "Olivier Merle", r: "lock", o: 82 },
     { n: "Abdelatif Benazzi", r: "flanker", o: 87, alt: ["lock", "number8"] },
     { n: "Laurent Cabannes", r: "flanker", o: 86, s: { breakdown: 89 } },
-    { n: "Marc Cécillon", r: "number8", o: 83 },
+    { n: "Philippe Benetton", r: "number8", o: 82 },
     { n: "Fabien Galthié", r: "scrumhalf", o: 85 },
     { n: "Thierry Lacroix", r: "flyhalf", o: 85, s: { goalKick: 91 } },
     { n: "Philippe Sella", r: "centre", o: 87 },

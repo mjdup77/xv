@@ -160,7 +160,7 @@ export const WC_1987_1991: Squad[] = [
     { n: "Olivier Roumat", r: "lock", o: 85, s: { setPiece: 88 } },
     { n: "Jean-Marie Cadieu", r: "lock", o: 80 },
     { n: "Laurent Cabannes", r: "flanker", o: 86, s: { breakdown: 90, pace: 88 } },
-    { n: "Marc Cécillon", r: "flanker", o: 83, alt: ["number8"] },
+    { n: "Éric Champ", r: "flanker", o: 82, s: { defence: 88 } },
     { n: "Abdelatif Benazzi", r: "number8", o: 84, alt: ["lock", "flanker"] },
     { n: "Pierre Berbizier", r: "scrumhalf", o: 85 },
     { n: "Franck Mesnel", r: "flyhalf", o: 84, alt: ["centre"] },
