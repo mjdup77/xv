@@ -80,7 +80,7 @@ export const WC_2003_2007: Squad[] = [
     { n: "CJ van der Linde", r: "prop", o: 84 },
     { n: "Bakkies Botha", r: "lock", o: 87, s: { setPiece: 89 } },
     { n: "Victor Matfield", r: "lock", o: 89, s: { setPiece: 92 } },
-    { n: "Schalk Burger", r: "flanker", o: 88, s: { breakdown: 89 } },
+    { n: "Schalk Burger", r: "flanker", o: 91, s: { breakdown: 92, defence: 91, carry: 90 } },
     { n: "Juan Smith", r: "flanker", o: 86 },
     { n: "Danie Rossouw", r: "number8", o: 83, alt: ["lock"] },
     { n: "Fourie du Preez", r: "scrumhalf", o: 90, s: { gameManage: 91, kick: 90 } },
