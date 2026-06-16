@@ -44,7 +44,7 @@ type Era = keyof typeof ERA;
 const RATING = {
   seasonal: {
     label: "Seasonal",
-    blurb: "Players rated at that World Cup (Habana '07 ≠ '15)",
+    blurb: "Players rated at that World Cup",
   },
   prime: {
     label: "Prime",

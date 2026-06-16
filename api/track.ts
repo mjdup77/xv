@@ -1,10 +1,14 @@
-// First-party event sink. Writes to your own Vercel Postgres when connected,
-// and safely no-ops (still returns 200) until then — so the client never breaks.
+// First-party event sink.
 //
-// To enable persistence: in the Vercel dashboard for this project, open
-// Storage -> Create Database -> Postgres. That injects POSTGRES_URL and events
-// start landing in the `events` table below. Analyse later with plain SQL.
+// Persists batched events to your own Vercel Blob store (private) as
+// newline-delimited JSON — one object per batch under events/<date>/. This is
+// clean to analyse later: download the objects and query with DuckDB/pandas/SQL
+// (e.g. duckdb> select * from read_json_auto('events/**/*.ndjson')).
+//
+// If a Postgres database is connected instead (POSTGRES_URL), it writes there.
+// Falls back to a safe no-op so the client never breaks.
 
+import { put } from "@vercel/blob";
 import { sql } from "@vercel/postgres";
 
 interface IncomingEvent {
@@ -47,10 +51,13 @@ async function ensureSchema() {
 }
 
 export default async function handler(
-  req: { method?: string; body?: unknown; headers: Record<string, string | string[] | undefined> },
+  req: {
+    method?: string;
+    body?: unknown;
+    headers: Record<string, string | string[] | undefined>;
+  },
   res: {
     status: (code: number) => { json: (body: unknown) => void };
-    setHeader: (k: string, v: string) => void;
   },
 ) {
   if (req.method !== "POST") {
@@ -58,9 +65,10 @@ export default async function handler(
     return;
   }
 
-  // No database configured yet: accept silently so the client keeps working.
-  if (!process.env.POSTGRES_URL) {
-    res.status(200).json({ ok: true, stored: 0, note: "no_db" });
+  const hasBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const hasPg = Boolean(process.env.POSTGRES_URL);
+  if (!hasBlob && !hasPg) {
+    res.status(200).json({ ok: true, stored: 0, note: "no_sink" });
     return;
   }
 
@@ -70,35 +78,52 @@ export default async function handler(
     const events: IncomingEvent[] = Array.isArray(
       (raw as { events?: unknown }).events,
     )
-      ? ((raw as { events: IncomingEvent[] }).events)
+      ? (raw as { events: IncomingEvent[] }).events
       : [];
-    if (events.length === 0) {
+    const valid = events
+      .slice(0, 100)
+      .filter((e) => e && typeof e.event === "string");
+    if (valid.length === 0) {
       res.status(200).json({ ok: true, stored: 0 });
       return;
     }
 
-    await ensureSchema();
-
     const country =
       (req.headers["x-vercel-ip-country"] as string | undefined) ?? null;
+    const receivedAt = new Date().toISOString();
 
-    let stored = 0;
-    for (const e of events.slice(0, 100)) {
-      if (!e || typeof e.event !== "string") continue;
-      await sql`
-        insert into events
-          (client_ts, user_id, session_id, run_id, event, difficulty, era, rating_mode, country, props)
-        values
-          (${e.ts ?? null}, ${e.user_id ?? null}, ${e.session_id ?? null},
-           ${e.run_id ?? null}, ${e.event}, ${e.difficulty ?? null},
-           ${e.era ?? null}, ${e.rating_mode ?? null}, ${country},
-           ${JSON.stringify(e.props ?? {})})
-      `;
-      stored++;
+    // Prefer Postgres if configured; otherwise write NDJSON to Blob.
+    if (hasPg) {
+      await ensureSchema();
+      for (const e of valid) {
+        await sql`
+          insert into events
+            (client_ts, user_id, session_id, run_id, event, difficulty, era, rating_mode, country, props)
+          values
+            (${e.ts ?? null}, ${e.user_id ?? null}, ${e.session_id ?? null},
+             ${e.run_id ?? null}, ${e.event}, ${e.difficulty ?? null},
+             ${e.era ?? null}, ${e.rating_mode ?? null}, ${country},
+             ${JSON.stringify(e.props ?? {})})
+        `;
+      }
+      res.status(200).json({ ok: true, stored: valid.length, sink: "postgres" });
+      return;
     }
-    res.status(200).json({ ok: true, stored });
+
+    const ndjson =
+      valid
+        .map((e) => JSON.stringify({ ...e, country, received_at: receivedAt }))
+        .join("\n") + "\n";
+    const day = receivedAt.slice(0, 10);
+    const rand = Math.random().toString(36).slice(2, 8);
+    const key = `events/${day}/${receivedAt.replace(/[:.]/g, "-")}-${rand}.ndjson`;
+    await put(key, ndjson, {
+      access: "private",
+      addRandomSuffix: false,
+      contentType: "application/x-ndjson",
+    });
+    res.status(200).json({ ok: true, stored: valid.length, sink: "blob" });
   } catch {
-    // Never surface storage errors to the client.
     res.status(200).json({ ok: false });
   }
 }
