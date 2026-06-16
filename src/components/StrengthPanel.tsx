@@ -1,12 +1,12 @@
 import type { Facets } from "../engine/ratings";
 
-const FACETS: [keyof Facets, string][] = [
-  ["setPiece", "Set-piece"],
-  ["breakdown", "Breakdown"],
-  ["defence", "Defence"],
-  ["attack", "Attack"],
-  ["control", "Control"],
-  ["goalKick", "Kicking"],
+const FACETS: [keyof Facets, string, string][] = [
+  ["setPiece", "Set-piece", "Scrum & lineout — props, hooker and locks (plus back row)"],
+  ["breakdown", "Breakdown", "Rucks & turnovers — driven by the back row and hooker"],
+  ["defence", "Defence", "Tackling across all 15 — back row and centres count most"],
+  ["attack", "Attack", "Line-breaking — the back line's handling, pace and carrying"],
+  ["control", "Control", "Game management — your fly-half and scrum-half"],
+  ["goalKick", "Kicking", "Goal-kicking — your best kicker (drives points, not tries)"],
 ];
 
 function tier(v: number): string {
@@ -43,10 +43,10 @@ export function StrengthPanel({
     <div className="strength-strip">
       <span className="ss-title">Squad strength</span>
       <div className="ss-facets">
-        {FACETS.map(([k, label]) => {
+        {FACETS.map(([k, label, desc]) => {
           const v = facets[k] as number;
           return (
-            <div className="sfacet" key={k} title={`${label}: ${Math.round(v)}`}>
+            <div className="sfacet" key={k} title={`${label} ${Math.round(v)} — ${desc}`}>
               <div className="sf-top">
                 <span className="sf-label">{label}</span>
                 {!hideRatings && <span className="sf-val">{Math.round(v)}</span>}
