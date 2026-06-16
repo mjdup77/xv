@@ -317,26 +317,45 @@ function deriveReview(
     return { wentWell, lessons };
   }
 
-  // Knockout exit — diagnose THAT defeat, with a clear cause → fix.
+  // Knockout exit — diagnose THAT defeat honestly. Only point to a unit that is
+  // genuinely a relative soft spot; never scold an already-elite squad.
   const loss = matches[matches.length - 1];
   const margin = loss.pa - loss.pf;
   lessons.push(
     `Your run ended in the ${loss.round.toLowerCase()}, ${loss.pf}–${loss.pa} to ${loss.opponent}.`,
   );
-  if (loss.triesAg >= 3 || f.defence <= f.attack - 4) {
+
+  const weakest = [...all].sort((a, b) => a[1] - b[1])[0];
+  const avg = all.reduce((s, x) => s + x[1], 0) / all.length;
+  // A "real" weakness is both low in absolute terms and clearly below the rest.
+  const hasRealWeakness = weakest[1] < 87 && weakest[1] <= avg - 2.5;
+  const fixHint: Record<string, string> = {
+    "set-piece": "a stronger front five lifts it",
+    breakdown: "a more abrasive back row lifts it",
+    defence: "a meaner back row and centres lift it",
+    attack: "more strike runners lift it",
+    "midfield control": "a sharper 9-10 axis lifts it",
+    "goal-kicking": "a deadeye kicker lifts it",
+  };
+
+  if (!hasRealWeakness) {
+    if (margin <= 7) {
+      lessons.push(
+        `Honestly? No weak link to fix — your lowest unit is ${weakest[0]} (${r(weakest[1])}). You lost by ${margin} to a top side; at this level it's fine margins and a bounce of the ball. Re-spin and it swings your way.`,
+      );
+    } else {
+      lessons.push(
+        `No unit let you down (lowest: ${weakest[0]}, ${r(weakest[1])}) — ${loss.opponent} were simply on song. Even a great XV gets caught cold once; run it back.`,
+      );
+    }
+  } else if (loss.triesAg > loss.tries) {
     lessons.push(
-      `You leaked ${loss.triesAg} tries that day — a tougher defence (${r(f.defence)}) is the fix: a meaner back row and centres.`,
-    );
-  } else if (loss.tries <= 1 || f.attack <= f.defence - 4) {
-    lessons.push(
-      `You managed only ${loss.tries} ${loss.tries === 1 ? "try" : "tries"} — more attacking threat would unlock them (weakest: ${weakestTry[0]}, ${r(weakestTry[1])}).`,
-    );
-  } else if (margin <= 5 && f.goalKick < 86) {
-    lessons.push(
-      `Lost by ${margin} — a sharper goal-kicker (${r(f.goalKick)}) turns these tight games your way.`,
+      `${loss.opponent} edged the try count ${loss.triesAg}–${loss.tries}; your ${weakest[0]} (${r(weakest[1])}) is the soft spot — ${fixHint[weakest[0]]}.`,
     );
   } else {
-    lessons.push("It was tight everywhere — small upgrades across the spine get you over the line.");
+    lessons.push(
+      `You couldn't quite pull clear; ${weakest[0]} (${r(weakest[1])}) is the unit to upgrade — ${fixHint[weakest[0]]}.`,
+    );
   }
   return { wentWell, lessons };
 }
