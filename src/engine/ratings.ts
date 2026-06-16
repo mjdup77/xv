@@ -41,19 +41,20 @@ export interface Tag {
 export function signatureTags(p: Player): Tag[] {
   const a = getAttrs(p);
   const cands: { tag: Tag; v: number; min: number }[] = [
-    { tag: { icon: "🎯", label: "Goal-kicker" }, v: a.goalKick, min: 84 },
-    { tag: { icon: "⚡", label: "Strike runner" }, v: a.pace, min: 89 },
-    { tag: { icon: "🎩", label: "Playmaker" }, v: a.gameManage, min: 87 },
+    { tag: { icon: "🎯", label: "Goal-kicker" }, v: a.goalKick, min: 90 },
+    { tag: { icon: "⚡", label: "Strike runner" }, v: a.pace, min: 92 },
+    { tag: { icon: "🎩", label: "Playmaker" }, v: a.gameManage, min: 91 },
     { tag: { icon: "🧱", label: "Enforcer" }, v: a.defence, min: 90 },
-    { tag: { icon: "💪", label: "Ball carrier" }, v: a.carry, min: 89 },
-    { tag: { icon: "🪝", label: "Jackal" }, v: a.breakdown, min: 89 },
+    { tag: { icon: "💪", label: "Ball carrier" }, v: a.carry, min: 91 },
+    { tag: { icon: "🪝", label: "Jackal" }, v: a.breakdown, min: 91 },
     { tag: { icon: "🏛️", label: "Set-piece rock" }, v: a.setPiece, min: 90 },
-    { tag: { icon: "🧤", label: "Distributor" }, v: a.handling, min: 90 },
+    { tag: { icon: "🧤", label: "Distributor" }, v: a.handling, min: 92 },
   ];
+  // Only the player's single most exceptional trait — keeps badges scarce.
   return cands
     .filter((c) => c.v >= c.min)
     .sort((x, y) => y.v - y.min - (x.v - x.min))
-    .slice(0, 2)
+    .slice(0, 1)
     .map((c) => c.tag);
 }
 
