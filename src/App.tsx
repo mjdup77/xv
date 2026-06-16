@@ -20,6 +20,7 @@ import {
   squadHasPick,
 } from "./engine/draft";
 import { computeFacets } from "./engine/ratings";
+import { StrengthPanel } from "./components/StrengthPanel";
 import { simulate } from "./engine/sim";
 import { Pitch } from "./components/Pitch";
 import { Result } from "./components/Result";
@@ -456,6 +457,9 @@ export default function App() {
             !isComplete && (
               <div className="pitch-tip">Tip: tap a player on the pitch to move them.</div>
             )
+          )}
+          {filled > 0 && (
+            <StrengthPanel facets={proj} hideRatings={hideRatings} filled={filled} />
           )}
         </div>
 
