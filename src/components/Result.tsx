@@ -4,6 +4,8 @@ import { Pitch } from "./Pitch";
 import { track } from "../analytics";
 
 const SHARE_URL = "https://xv-7-0.vercel.app/";
+// Tagged variant so we can measure the viral loop (shares -> clicks -> users).
+const SHARE_LINK = `${SHARE_URL}?utm_source=share&utm_medium=result`;
 
 interface Props {
   result: TournamentResult;
@@ -48,7 +50,7 @@ export function Result({ result, lineup, onPlayAgain }: Props) {
       : result.champion
         ? `I won the Rugby World Cup on XV 🏆 (Perfect score ${result.perfectScore}/35).`
         : `${result.verdict} on XV. My run scored ${result.perfectScore}/35. Can you go all the way?`;
-    const text = `${line}\nPlay: ${SHARE_URL}`;
+    const text = `${line}\nPlay: ${SHARE_LINK}`;
 
     const canNativeShare =
       typeof navigator !== "undefined" && typeof navigator.share === "function";
@@ -61,7 +63,7 @@ export function Result({ result, lineup, onPlayAgain }: Props) {
 
     try {
       if (canNativeShare) {
-        await navigator.share({ title: "XV", text: line, url: SHARE_URL });
+        await navigator.share({ title: "XV", text: line, url: SHARE_LINK });
         return;
       }
     } catch {

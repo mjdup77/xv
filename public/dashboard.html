@@ -69,6 +69,9 @@
             <div class="sub" id="meta">Loading…</div>
           </div>
           <div>
+            <label class="muted" style="margin-right:10px;font-size:13px;cursor:pointer">
+              <input id="hideMe" type="checkbox" onchange="toggleHideMe()" /> Hide my traffic
+            </label>
             <button class="btn ghost" onclick="load()">Refresh</button>
             <button class="btn ghost" onclick="logout()">Sign out</button>
           </div>
@@ -90,6 +93,17 @@
           <div>
             <h2>Settings mix</h2>
             <div class="panel" id="breakdowns"></div>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top:16px">
+          <div>
+            <h2>Where drafts are abandoned</h2>
+            <div class="panel" id="abandon"></div>
+          </div>
+          <div>
+            <h2>Acquisition sources</h2>
+            <div class="panel" id="sources"></div>
           </div>
         </div>
 
@@ -133,15 +147,30 @@
         }
       }
 
+      const HIDE_LS = "xv_stats_hide_me";
+      function myUid() {
+        try { return localStorage.getItem("xv_uid") || ""; } catch { return ""; }
+      }
+      function hideMe() { return localStorage.getItem(HIDE_LS) !== "0"; }
+      function toggleHideMe() {
+        localStorage.setItem(HIDE_LS, document.getElementById("hideMe").checked ? "1" : "0");
+        load();
+      }
+
       async function load() {
         const k = localStorage.getItem(KEY_LS);
         if (!k) return;
         document.getElementById("gate").style.display = "none";
         document.getElementById("app").style.display = "block";
+        const cb = document.getElementById("hideMe");
+        if (cb) cb.checked = hideMe();
         const errBox = document.getElementById("err");
         errBox.textContent = "";
         try {
-          const res = await fetch("/api/stats?key=" + encodeURIComponent(k));
+          let q = "/api/stats?key=" + encodeURIComponent(k);
+          const uid = myUid();
+          if (hideMe() && uid) q += "&exclude=" + encodeURIComponent(uid);
+          const res = await fetch(q);
           if (res.status === 401) {
             localStorage.removeItem(KEY_LS);
             document.getElementById("gate").style.display = "block";
@@ -160,7 +189,8 @@
       function render(d) {
         const t = d.totals, r = d.rates;
         document.getElementById("meta").textContent =
-          "Updated " + new Date(d.generatedAt).toLocaleString() + " · " + t.events + " events";
+          "Updated " + new Date(d.generatedAt).toLocaleString() + " · " + t.events + " events" +
+          (d.excludedUsers ? " · " + d.excludedUsers + " test user(s) hidden" : "");
 
         const cards = [
           ["Players", t.users, null],
@@ -217,6 +247,30 @@
           bars(holder, Object.entries(obj).sort((a, b) => b[1] - a[1]));
           bd.appendChild(holder);
         }
+
+        // Draft abandons by slot reached (sorted by slot number).
+        const ab = document.getElementById("abandon");
+        const abEntries = Object.entries(d.abandonByRound || {}).sort((a, b) => {
+          const na = parseInt(a[0].replace(/\D/g, "")) || 99;
+          const nb = parseInt(b[0].replace(/\D/g, "")) || 99;
+          return na - nb;
+        });
+        if (abEntries.length) {
+          ab.innerHTML = "";
+          ab.appendChild(el("div", "muted",
+            (t.runsAbandoned || 0) + " of " + t.runsStarted + " runs abandoned mid-draft"));
+          const holder = el("div");
+          bars(holder, abEntries);
+          ab.appendChild(holder);
+        } else {
+          ab.innerHTML = "<div class='muted'>No drafts abandoned yet.</div>";
+        }
+
+        // Acquisition sources.
+        const sc = document.getElementById("sources");
+        const scEntries = Object.entries(d.sources || {}).sort((a, b) => b[1] - a[1]);
+        if (scEntries.length) { sc.innerHTML = ""; bars(sc, scEntries); }
+        else sc.innerHTML = "<div class='muted'>No source data yet.</div>";
 
         const tbl = document.getElementById("runs");
         tbl.innerHTML =

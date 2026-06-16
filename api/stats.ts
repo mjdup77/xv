@@ -20,7 +20,7 @@ interface Ev {
   props?: Record<string, unknown>;
 }
 
-let cache: { at: number; data: unknown } | null = null;
+const cache = new Map<string, { at: number; data: unknown }>();
 const TTL_MS = 30_000;
 
 function dayOf(e: Ev): string {
@@ -70,6 +70,8 @@ function aggregate(events: Ev[]) {
   const ratingMode: Record<string, number> = {};
   const countries: Record<string, number> = {};
   const runStartUsers = new Set<string>();
+  const abandonByRound: Record<string, number> = {};
+  const sources: Record<string, number> = {};
 
   let runsStarted = 0,
     xvCompleted = 0,
@@ -78,7 +80,8 @@ function aggregate(events: Ev[]) {
     champions = 0,
     perfect35 = 0,
     shares = 0,
-    respins = 0;
+    respins = 0,
+    runsAbandoned = 0;
 
   const recentRuns: {
     ts: string;
@@ -105,6 +108,32 @@ function aggregate(events: Ev[]) {
         inc(era, e.era);
         inc(ratingMode, e.rating_mode);
         break;
+      case "run_abandoned": {
+        runsAbandoned++;
+        const round = Number((e.props || {}).round);
+        // Bucket by the slot they had reached when they quit (1..15).
+        inc(abandonByRound, Number.isFinite(round) ? `Slot ${round}` : "unknown");
+        break;
+      }
+      case "app_opened": {
+        // Acquisition source: utm_source if present, else referrer host, else direct.
+        const p = e.props || {};
+        const utm = (p.utm || {}) as Record<string, string>;
+        let src = utm.utm_source;
+        if (!src) {
+          const ref = p.referrer ? String(p.referrer) : "";
+          if (!ref) src = "direct";
+          else {
+            try {
+              src = new URL(ref).hostname.replace(/^www\./, "");
+            } catch {
+              src = "other";
+            }
+          }
+        }
+        inc(sources, src);
+        break;
+      }
       case "xv_completed":
         xvCompleted++;
         break;
@@ -156,6 +185,7 @@ function aggregate(events: Ev[]) {
       perfect35,
       shares,
       respins,
+      runsAbandoned,
     },
     rates: {
       draftCompletion: runsStarted ? +(xvCompleted / runsStarted).toFixed(3) : 0,
@@ -171,6 +201,8 @@ function aggregate(events: Ev[]) {
     ],
     dailyActive,
     breakdowns: { difficulty, era, ratingMode },
+    abandonByRound,
+    sources,
     eventCounts,
     countries,
     recentRuns: recentRuns.slice(0, 25),
@@ -201,14 +233,30 @@ export default async function handler(
     return;
   }
 
-  if (cache && Date.now() - cache.at < TTL_MS) {
-    res.status(200).json(cache.data);
+  // User IDs to drop (your own test traffic). Sources: ?exclude=a,b plus the
+  // EXCLUDE_USER_IDS env var, so it works whether set per-request or globally.
+  const excluded = new Set(
+    [
+      ...(url.searchParams.get("exclude") || "").split(","),
+      ...(process.env.EXCLUDE_USER_IDS || "").split(","),
+    ]
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  const cacheKey = [...excluded].sort().join("|") || "all";
+
+  const hit = cache.get(cacheKey);
+  if (hit && Date.now() - hit.at < TTL_MS) {
+    res.status(200).json(hit.data);
     return;
   }
   try {
-    const events = await readAllEvents(process.env.BLOB_READ_WRITE_TOKEN);
-    const data = aggregate(events);
-    cache = { at: Date.now(), data };
+    let events = await readAllEvents(process.env.BLOB_READ_WRITE_TOKEN);
+    if (excluded.size)
+      events = events.filter((e) => !e.user_id || !excluded.has(e.user_id));
+    const data = aggregate(events) as Record<string, unknown>;
+    data.excludedUsers = excluded.size;
+    cache.set(cacheKey, { at: Date.now(), data });
     res.status(200).json(data);
   } catch (err) {
     res.status(500).json({ error: "aggregate_failed", detail: String(err) });
