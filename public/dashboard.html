@@ -241,6 +241,18 @@
         if (localStorage.getItem(KEY_LS)) load();
       }, 60000);
 
+      // Allow one-click auth via URL: dashboard.html#key=YOURKEY (or ?key=).
+      (function () {
+        const fromHash = (location.hash || "").match(/key=([^&]+)/);
+        const fromQuery = new URLSearchParams(location.search).get("key");
+        const urlKey = fromHash ? decodeURIComponent(fromHash[1]) : fromQuery;
+        if (urlKey) {
+          localStorage.setItem(KEY_LS, urlKey.trim());
+          // Scrub the key from the address bar so it isn't left visible.
+          history.replaceState(null, "", location.pathname);
+        }
+      })();
+
       if (localStorage.getItem(KEY_LS)) load();
     </script>
   </body>
