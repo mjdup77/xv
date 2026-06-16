@@ -77,38 +77,7 @@ export interface Facets {
   control: number;
   goalKick: number;
   discipline: number;
-  chemistry: number;
   overall: number;
-}
-
-export function computeChemistry(lineup: Lineup): number {
-  const same = (ids: SlotId[]) => {
-    const ps = ids.map((s) => lineup[s]).filter(Boolean) as Player[];
-    if (ps.length < ids.length) return false;
-    return ps.every((p) => p.nation === ps[0].nation && p.year === ps[0].year);
-  };
-
-  let chem = 0;
-  if (same(["LH", "HK", "TH"])) chem += 4; // a genuine front row
-  if (same(["L4", "L5"])) chem += 2;
-  if (same(["F6", "F7", "N8"])) chem += 2;
-  if (same(["SH", "FH"])) chem += 4; // half-back partnership
-  if (same(["IC", "OC"])) chem += 2;
-  if (same(["LW", "RW", "FB"])) chem += 1;
-
-  const players = Object.values(lineup).filter(Boolean) as Player[];
-  if (players.length) {
-    const counts = new Map<string, number>();
-    for (const p of players) counts.set(p.nation, (counts.get(p.nation) ?? 0) + 1);
-    for (const c of counts.values()) if (c >= 3) chem += (c - 2) * 0.8;
-
-    const years = players.map((p) => p.year);
-    const spread = Math.max(...years) - Math.min(...years);
-    if (spread <= 4) chem += 2;
-    else if (spread <= 10) chem += 1;
-  }
-
-  return Math.min(14, Math.round(chem * 10) / 10);
 }
 
 export function computeFacets(lineup: Lineup): Facets {
@@ -163,8 +132,6 @@ export function computeFacets(lineup: Lineup): Facets {
     ? present.reduce((s, p) => s + getAttrs(p).discipline, 0) / present.length
     : 0;
 
-  const chemistry = computeChemistry(lineup);
-
   const overall =
     setPiece * 0.16 +
     breakdown * 0.14 +
@@ -172,8 +139,7 @@ export function computeFacets(lineup: Lineup): Facets {
     attack * 0.22 +
     control * 0.14 +
     goalKick * 0.08 +
-    discipline * 0.06 +
-    chemistry * 0.55;
+    discipline * 0.06;
 
-  return { setPiece, breakdown, defence, attack, control, goalKick, discipline, chemistry, overall };
+  return { setPiece, breakdown, defence, attack, control, goalKick, discipline, overall };
 }

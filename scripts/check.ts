@@ -79,7 +79,7 @@ function report(name: string, lineup: Lineup, n = 4000) {
   }
   const f = computeFacets(lineup);
   console.log(
-    `${name.padEnd(22)} slots=${filled} ovr=${f.overall.toFixed(1)} chem=${f.chemistry.toFixed(1)} | ` +
+    `${name.padEnd(22)} slots=${filled} ovr=${f.overall.toFixed(1)} | ` +
       `advance=${((advance / n) * 100).toFixed(1)}% champ=${((champ / n) * 100).toFixed(1)}% ` +
       `perfect35=${((perfect / n) * 100).toFixed(2)}% avgScore=${(scoreSum / n).toFixed(1)}`,
   );

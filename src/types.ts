@@ -94,7 +94,6 @@ export interface TournamentResult {
   perfect35: boolean; // bonus-point win in all 7
   perfectScore: number; // sum of game points (5 per BP win, 4 per win, etc.)
   facets: Record<string, number>;
-  chemistry: number;
   overall: number;
   verdict: string;
   identity: string;

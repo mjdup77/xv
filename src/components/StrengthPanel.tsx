@@ -31,7 +31,7 @@ export function StrengthPanel({
     facets.control * 0.2 +
     facets.setPiece * 0.15 +
     facets.goalKick * 0.15 +
-    facets.chemistry * 0.6;
+    6;
 
   const outlook =
     filled < 8

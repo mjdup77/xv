@@ -30,11 +30,15 @@ const ROUNDS: RoundCfg[] = [
     { name: "New Zealand", flag: "🇳🇿" }, { name: "South Africa", flag: "🇿🇦" } ] },
 ];
 
+// Attacking & defensive output of the XV. Pure player quality — no cohesion
+// bonus, since this is a draft game built from players across every era.
+// The flat constants preserve the historical difficulty curve after removing
+// the old chemistry term.
 function powers(f: Facets) {
   const attack =
-    f.attack * 0.5 + f.control * 0.2 + f.setPiece * 0.15 + f.goalKick * 0.15 + f.chemistry * 0.6;
+    f.attack * 0.5 + f.control * 0.2 + f.setPiece * 0.15 + f.goalKick * 0.15 + 6;
   const defence =
-    f.defence * 0.55 + f.breakdown * 0.2 + f.setPiece * 0.15 + f.discipline * 0.1 + f.chemistry * 0.4;
+    f.defence * 0.55 + f.breakdown * 0.2 + f.setPiece * 0.15 + f.discipline * 0.1 + 4;
   return { attack, defence };
 }
 
@@ -385,7 +389,6 @@ export function simulate(lineup: Lineup, seed: string): TournamentResult {
     perfect35,
     perfectScore,
     facets,
-    chemistry: f.chemistry,
     overall: f.overall,
     verdict,
     identity: deriveIdentity(f),
