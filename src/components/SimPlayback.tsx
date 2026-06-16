@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { TournamentResult } from "../types";
+import { track } from "../analytics";
 
 interface Props {
   result: TournamentResult;
@@ -21,6 +22,7 @@ export function SimPlayback({ result, onDone }: Props) {
   }, [n, total]);
 
   const skip = () => {
+    track("sim_skipped", { at_match: n });
     setN(total);
     setDone(true);
   };
@@ -72,7 +74,13 @@ export function SimPlayback({ result, onDone }: Props) {
 
       <div className="sim-actions">
         {done ? (
-          <button className="btn primary big" onClick={onDone}>
+          <button
+            className="btn primary big"
+            onClick={() => {
+              track("result_viewed", {});
+              onDone();
+            }}
+          >
             See the Full Breakdown →
           </button>
         ) : (

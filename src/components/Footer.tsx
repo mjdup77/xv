@@ -1,4 +1,5 @@
 import { COFFEE_URL, CREATOR, FEEDBACK_URL } from "../config";
+import { track } from "../analytics";
 
 export function Footer() {
   return (
@@ -13,12 +14,22 @@ export function Footer() {
       </p>
       <div className="footer-links">
         {COFFEE_URL && (
-          <a href={COFFEE_URL} target="_blank" rel="noreferrer">
+          <a
+            href={COFFEE_URL}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => track("coffee_clicked", {})}
+          >
             ☕ Buy me a coffee
           </a>
         )}
         {FEEDBACK_URL && (
-          <a href={FEEDBACK_URL} target="_blank" rel="noreferrer">
+          <a
+            href={FEEDBACK_URL}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => track("feedback_clicked", {})}
+          >
             Give feedback
           </a>
         )}

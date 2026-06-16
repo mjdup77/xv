@@ -1,5 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./index.css";
+import {
+  initAnalytics,
+  startRunContext,
+  endRunContext,
+  track,
+} from "./analytics";
 import type { Lineup, Player, SlotId, Squad, TournamentResult } from "./types";
 import { positionLabel, ROLE_ORDER } from "./data/slots";
 import { SQUADS, applyRatingMode, type RatingMode } from "./data/squads";
@@ -78,10 +84,16 @@ export default function App() {
   const filled = 15 - remaining.length;
   const proj = useMemo(() => computeFacets(lineup), [lineup]);
 
+  useEffect(() => {
+    initAnalytics();
+  }, []);
+
   const startRun = useCallback(
     (daily: boolean) => {
       const cfg = DIFFICULTY[difficulty];
       const s = daily ? todaySeed() : randomSeed();
+      startRunContext({ difficulty, era, rating_mode: ratingMode });
+      track("run_started", { mode: daily ? "daily" : "new", seed: s });
       setSeed(s);
       setSpins(buildSpinSequence(s, 60, ERA[era].minYear, ratingMode));
       setSpinIndex(0);
@@ -101,16 +113,29 @@ export default function App() {
 
   const landSquad = useCallback(
     (curLineup: Lineup, curPicked: Set<string>, fromIndex: number) => {
+      const round = 15 - openSlots(curLineup).length + 1;
       for (let i = fromIndex; i < spins.length; i++) {
         if (squadHasPick(spins[i], curLineup, curPicked)) {
           setCurrentSquad(spins[i]);
           setSpinIndex(i + 1);
+          track("wheel_spun", {
+            round,
+            squad_nation: spins[i].nation,
+            squad_year: spins[i].year,
+          });
           return;
         }
       }
       // Fallback: any usable squad in the dataset (respecting rating mode).
       const any = SQUADS.find((sq) => squadHasPick(sq, curLineup, curPicked));
       setCurrentSquad(any ? applyRatingMode(any, ratingMode) : null);
+      if (any)
+        track("wheel_spun", {
+          round,
+          squad_nation: any.nation,
+          squad_year: any.year,
+          fallback: true,
+        });
     },
     [spins, ratingMode],
   );
@@ -141,13 +166,29 @@ export default function App() {
       const newLineup = { ...lineup, [slot]: p };
       const newPicked = new Set(pickedIds);
       newPicked.add(p.id);
+      const newFilled = 15 - openSlots(newLineup).length;
+      track("player_picked", {
+        round: newFilled,
+        slot,
+        player_name: p.name,
+        player_ovr: p.ovr,
+        position: p.role,
+        squad_nation: p.nation,
+        squad_year: p.year,
+      });
+      if (newFilled === 15) {
+        track("xv_completed", {
+          squad_overall: Math.round(computeFacets(newLineup).overall),
+          respins_left: respinsLeft,
+        });
+      }
       setLineup(newLineup);
       setPickedIds(newPicked);
       setCurrentSquad(null);
       setSelectedPlayer(null);
       setMovingSlot(null);
     },
-    [lineup, pickedIds],
+    [lineup, pickedIds, respinsLeft],
   );
 
   const pickPlayer = useCallback(
@@ -182,6 +223,11 @@ export default function App() {
         if (slot === movingSlot) {
           setMovingSlot(null);
         } else if (moveTargets(movingSlot, lineup).includes(slot)) {
+          track("player_moved", {
+            from_slot: movingSlot,
+            to_slot: slot,
+            is_swap: Boolean(lineup[slot]),
+          });
           setLineup(applyMove(movingSlot, slot, lineup));
           setMovingSlot(null);
         }
@@ -195,13 +241,27 @@ export default function App() {
 
   const reSpin = useCallback(() => {
     if (respinsLeft <= 0) return;
+    track("respin_used", { round: filled + 1, respins_left: respinsLeft - 1 });
     setRespinsLeft((r) => r - 1);
     setCurrentSquad(null);
     doSpin();
-  }, [respinsLeft, doSpin]);
+  }, [respinsLeft, doSpin, filled]);
 
   const kickOff = useCallback(() => {
-    setResult(simulate(lineup, seed));
+    track("kickoff_clicked", {});
+    const r = simulate(lineup, seed);
+    track("run_completed", {
+      champion: r.champion,
+      perfect35: r.perfect35,
+      perfect_score: r.perfectScore,
+      overall: Math.round(r.overall),
+      advanced_from_pool: r.advancedFromPool,
+      tries_for: r.triesFor,
+      tries_against: r.triesAgainst,
+      verdict: r.verdict,
+      identity: r.identity,
+    });
+    setResult(r);
     setPhase("sim");
   }, [lineup, seed]);
 
@@ -325,7 +385,14 @@ export default function App() {
   return (
     <div className="draft">
       <header className="draft-head">
-        <div className="logo-sm" onClick={() => setPhase("home")}>
+        <div
+          className="logo-sm"
+          onClick={() => {
+            track("run_abandoned", { round: filled + 1 });
+            endRunContext();
+            setPhase("home");
+          }}
+        >
           XV
         </div>
         <div className="progress">

@@ -1,5 +1,6 @@
 import type { Lineup, TournamentResult } from "../types";
 import { Pitch } from "./Pitch";
+import { track } from "../analytics";
 
 interface Props {
   result: TournamentResult;
@@ -44,6 +45,12 @@ export function Result({ result, lineup, seed, onPlayAgain }: Props) {
         : `${result.verdict} on XV. My run scored ${result.perfectScore}/35. Can you go all the way?`;
     const text = `${line}\nPlay: https://xv.app  (seed ${seed})`;
     navigator.clipboard?.writeText(text);
+    track("share_clicked", {
+      method: "copy",
+      champion: result.champion,
+      perfect35: result.perfect35,
+      perfect_score: result.perfectScore,
+    });
   };
 
   return (
@@ -145,7 +152,13 @@ export function Result({ result, lineup, seed, onPlayAgain }: Props) {
       </div>
 
       <div className="result-actions">
-        <button className="btn primary" onClick={onPlayAgain}>
+        <button
+          className="btn primary"
+          onClick={() => {
+            track("play_again_clicked", { from: "result" });
+            onPlayAgain();
+          }}
+        >
           New Run
         </button>
         <button className="btn ghost" onClick={share}>
