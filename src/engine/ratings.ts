@@ -39,6 +39,8 @@ export interface Tag {
 // genuinely standout traits qualify, so most players get 0-2 and the truly
 // elite get the punchiest badges.
 export function signatureTags(p: Player): Tag[] {
+  // Only genuinely top-tier players (88+) earn a badge, keeping it a real signal.
+  if (p.ovr < 88) return [];
   const a = getAttrs(p);
   const cands: { tag: Tag; v: number; min: number }[] = [
     { tag: { icon: "🎯", label: "Goal-kicker" }, v: a.goalKick, min: 90 },

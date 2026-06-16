@@ -11,22 +11,23 @@ interface RoundCfg {
   round: string;
   rating: number; // opponent strength
   pool: { name: string; flag: string }[];
+  swing: number; // how much the opponent can over/under-perform on the day
 }
 
 const ROUNDS: RoundCfg[] = [
-  { round: "Pool Match 1", rating: 70, pool: [
+  { round: "Pool Match 1", rating: 62, swing: 3, pool: [
     { name: "Namibia", flag: "🇳🇦" }, { name: "Uruguay", flag: "🇺🇾" }, { name: "Romania", flag: "🇷🇴" } ] },
-  { round: "Pool Match 2", rating: 77, pool: [
+  { round: "Pool Match 2", rating: 71, swing: 3.5, pool: [
     { name: "Georgia", flag: "🇬🇪" }, { name: "Tonga", flag: "🇹🇴" }, { name: "Samoa", flag: "🇼🇸" } ] },
-  { round: "Pool Match 3", rating: 81, pool: [
+  { round: "Pool Match 3", rating: 78, swing: 4.5, pool: [
     { name: "Japan", flag: "🇯🇵" }, { name: "Fiji", flag: "🇫🇯" }, { name: "Italy", flag: "🇮🇹" } ] },
-  { round: "Pool Match 4", rating: 84, pool: [
+  { round: "Pool Match 4", rating: 83, swing: 5.5, pool: [
     { name: "Scotland", flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" }, { name: "Argentina", flag: "🇦🇷" }, { name: "Wales", flag: "🏴󠁧󠁢󠁷󠁬󠁳󠁿" } ] },
-  { round: "Quarter-final", rating: 85, pool: [
+  { round: "Quarter-final", rating: 86, swing: 6, pool: [
     { name: "Australia", flag: "🇦🇺" }, { name: "Argentina", flag: "🇦🇷" }, { name: "Ireland", flag: "☘️" } ] },
-  { round: "Semi-final", rating: 87, pool: [
+  { round: "Semi-final", rating: 88, swing: 6.5, pool: [
     { name: "England", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { name: "France", flag: "🇫🇷" }, { name: "Ireland", flag: "☘️" } ] },
-  { round: "Final", rating: 90, pool: [
+  { round: "Final", rating: 91, swing: 7, pool: [
     { name: "New Zealand", flag: "🇳🇿" }, { name: "South Africa", flag: "🇿🇦" } ] },
 ];
 
@@ -72,14 +73,16 @@ function simMatch(
   rng: Rng,
 ): MatchResult {
   const opp = rng.pick(cfg.pool);
-  // A shared "day" swing: on an off day the opponent plays above themselves,
-  // which means fewer tries for you and more against — the source of upsets.
-  const R = cfg.rating + rng.normal(0, 6.5);
+  // A shared "day" swing: on an off day the opponent plays above themselves.
+  // It's small against minnows (predictable thrashings) and larger in the big
+  // knockout games (the source of upsets).
+  const R = cfg.rating + rng.normal(0, cfg.swing);
 
-  // 1) Tries — the foundation everything else is built on.
-  let tries = Math.round((attack - R) * 0.09 + 2.4 + rng.normal(0, 1.0));
-  tries = Math.max(0, Math.min(9, tries));
-  let triesAg = Math.round((R - defence) * 0.09 + 2.0 + rng.normal(0, 1.0));
+  // 1) Tries — the foundation everything else is built on. The steeper slope
+  //    means a big quality gap produces a genuine blow-out vs weak teams.
+  let tries = Math.round((attack - R) * 0.155 + 1.6 + rng.normal(0, 1.0));
+  tries = Math.max(0, Math.min(11, tries));
+  let triesAg = Math.round((R - defence) * 0.11 + 1.7 + rng.normal(0, 0.9));
   triesAg = Math.max(0, Math.min(9, triesAg));
 
   // 2) Goal-kicking turns tries into conversions and infringements into points.
