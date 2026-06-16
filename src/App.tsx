@@ -16,6 +16,7 @@ import {
   isPickable,
   moveTargets,
   openSlots,
+  playerKey,
   squadHasPick,
 } from "./engine/draft";
 import { computeFacets } from "./engine/ratings";
@@ -65,7 +66,7 @@ export default function App() {
   const [spins, setSpins] = useState<Squad[]>([]);
   const [spinIndex, setSpinIndex] = useState(0);
   const [lineup, setLineup] = useState<Lineup>({});
-  const [pickedIds, setPickedIds] = useState<Set<string>>(new Set());
+  const [pickedKeys, setPickedKeys] = useState<Set<string>>(new Set());
   const [currentSquad, setCurrentSquad] = useState<Squad | null>(null);
   const [spinning, setSpinning] = useState(false);
   const [spinLabel, setSpinLabel] = useState<Squad | null>(null);
@@ -98,7 +99,7 @@ export default function App() {
       setSpins(buildSpinSequence(s, 60, ERA[era].minYear, ratingMode));
       setSpinIndex(0);
       setLineup({});
-      setPickedIds(new Set());
+      setPickedKeys(new Set());
       setCurrentSquad(null);
       setSelectedPlayer(null);
       setMovingSlot(null);
@@ -155,17 +156,17 @@ export default function App() {
       } else {
         setSpinning(false);
         setSpinLabel(null);
-        landSquad(lineup, pickedIds, spinIndex);
+        landSquad(lineup, pickedKeys, spinIndex);
       }
     };
     animRef.current = requestAnimationFrame(tick);
-  }, [spinning, lineup, pickedIds, spinIndex, landSquad]);
+  }, [spinning, lineup, pickedKeys, spinIndex, landSquad]);
 
   const assign = useCallback(
     (p: Player, slot: SlotId) => {
       const newLineup = { ...lineup, [slot]: p };
-      const newPicked = new Set(pickedIds);
-      newPicked.add(p.id);
+      const newPicked = new Set(pickedKeys);
+      newPicked.add(playerKey(p));
       const newFilled = 15 - openSlots(newLineup).length;
       track("player_picked", {
         round: newFilled,
@@ -183,12 +184,12 @@ export default function App() {
         });
       }
       setLineup(newLineup);
-      setPickedIds(newPicked);
+      setPickedKeys(newPicked);
       setCurrentSquad(null);
       setSelectedPlayer(null);
       setMovingSlot(null);
     },
-    [lineup, pickedIds, respinsLeft],
+    [lineup, pickedKeys, respinsLeft],
   );
 
   const pickPlayer = useCallback(
@@ -476,7 +477,7 @@ export default function App() {
               <p className="pick-hint">Draft one player into your XV:</p>
               <ul className="player-list">
                 {[...currentSquad.players]
-                  .map((p) => ({ p, ok: isPickable(p, lineup, pickedIds) }))
+                  .map((p) => ({ p, ok: isPickable(p, lineup, pickedKeys) }))
                   .sort((a, b) =>
                     a.ok !== b.ok
                       ? Number(b.ok) - Number(a.ok)
@@ -495,7 +496,7 @@ export default function App() {
                         {!hideRatings && <span className="pr-ovr">{p.ovr}</span>}
                         <span className="pr-name">{p.name}</span>
                         <span className="pr-pos">
-                          {pickedIds.has(p.id) ? "picked" : positionLabel(p)}
+                          {pickedKeys.has(playerKey(p)) ? "picked" : positionLabel(p)}
                         </span>
                       </button>
                     </li>

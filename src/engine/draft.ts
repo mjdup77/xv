@@ -7,6 +7,12 @@ export function rolesOf(p: Player): string[] {
   return [p.role, ...(p.alt ?? [])];
 }
 
+// Identity for dedup: the same person across different World Cup years (e.g.
+// Campese '87 vs '91) must not be drafted twice, so we key on name, not id.
+export function playerKey(p: Player): string {
+  return p.name.trim().toLowerCase();
+}
+
 export function openSlots(lineup: Lineup): SlotId[] {
   return SLOTS.filter((s) => !lineup[s.id]).map((s) => s.id);
 }
@@ -16,17 +22,17 @@ export function eligibleOpenSlots(p: Player, lineup: Lineup): SlotId[] {
   return eligibleSlots(rolesOf(p), openSlots(lineup));
 }
 
-export function isPickable(p: Player, lineup: Lineup, pickedIds: Set<string>): boolean {
-  if (pickedIds.has(p.id)) return false;
+export function isPickable(p: Player, lineup: Lineup, pickedKeys: Set<string>): boolean {
+  if (pickedKeys.has(playerKey(p))) return false;
   return eligibleOpenSlots(p, lineup).length > 0;
 }
 
 export function squadHasPick(
   squad: Squad,
   lineup: Lineup,
-  pickedIds: Set<string>,
+  pickedKeys: Set<string>,
 ): boolean {
-  return squad.players.some((p) => isPickable(p, lineup, pickedIds));
+  return squad.players.some((p) => isPickable(p, lineup, pickedKeys));
 }
 
 // Slots an already-placed player can be moved to: open eligible slots, plus
