@@ -8,7 +8,7 @@ import {
 } from "./analytics";
 import type { Lineup, Player, SlotId, Squad, TournamentResult } from "./types";
 import { positionLabel, ROLE_ORDER } from "./data/slots";
-import { SQUADS, applyRatingMode, type RatingMode } from "./data/squads";
+import { SQUADS, type RatingMode } from "./data/squads";
 import {
   applyMove,
   buildSpinSequence,
@@ -79,6 +79,7 @@ export default function App() {
   const [hideRatings, setHideRatings] = useState(false);
   const [result, setResult] = useState<TournamentResult | null>(null);
   const animRef = useRef<number | null>(null);
+  const lastSquadIdRef = useRef<string | null>(null);
 
   const remaining = openSlots(lineup);
   const isComplete = remaining.length === 0;
@@ -101,6 +102,7 @@ export default function App() {
       setLineup({});
       setPickedKeys(new Set());
       setCurrentSquad(null);
+      lastSquadIdRef.current = null;
       setSelectedPlayer(null);
       setMovingSlot(null);
       setSpinning(false);
@@ -115,30 +117,48 @@ export default function App() {
   const landSquad = useCallback(
     (curLineup: Lineup, curPicked: Set<string>, fromIndex: number) => {
       const round = 15 - openSlots(curLineup).length + 1;
+      // The squad currently shown (the one being re-spun away from). Never land
+      // back on it unless it's the only option, so re-spins always feel fresh.
+      const avoid = lastSquadIdRef.current;
+      const landOn = (sq: Squad, nextIndex: number | null, fallback: boolean) => {
+        lastSquadIdRef.current = sq.id;
+        setCurrentSquad(sq);
+        if (nextIndex !== null) setSpinIndex(nextIndex);
+        track("wheel_spun", {
+          round,
+          squad_nation: sq.nation,
+          squad_year: sq.year,
+          ...(fallback ? { fallback: true } : {}),
+        });
+      };
+      // Pass 1: next pickable squad in the pre-rolled sequence that differs from
+      // the one we're leaving.
       for (let i = fromIndex; i < spins.length; i++) {
-        if (squadHasPick(spins[i], curLineup, curPicked)) {
-          setCurrentSquad(spins[i]);
-          setSpinIndex(i + 1);
-          track("wheel_spun", {
-            round,
-            squad_nation: spins[i].nation,
-            squad_year: spins[i].year,
-          });
+        if (spins[i].id !== avoid && squadHasPick(spins[i], curLineup, curPicked)) {
+          landOn(spins[i], i + 1, false);
           return;
         }
       }
-      // Fallback: any usable squad in the dataset (respecting rating mode).
-      const any = SQUADS.find((sq) => squadHasPick(sq, curLineup, curPicked));
-      setCurrentSquad(any ? applyRatingMode(any, ratingMode) : null);
-      if (any)
-        track("wheel_spun", {
-          round,
-          squad_nation: any.nation,
-          squad_year: any.year,
-          fallback: true,
-        });
+      // Pass 2: allow repeating the same id only if the sequence has nothing else.
+      for (let i = fromIndex; i < spins.length; i++) {
+        if (squadHasPick(spins[i], curLineup, curPicked)) {
+          landOn(spins[i], i + 1, false);
+          return;
+        }
+      }
+      // Fallback (sequence exhausted): random pickable squad from the same
+      // era/rating pool, avoiding the current one where possible.
+      const pool = Array.from(new Map(spins.map((s) => [s.id, s])).values());
+      const pickable = pool.filter((sq) => squadHasPick(sq, curLineup, curPicked));
+      const preferred = pickable.filter((sq) => sq.id !== avoid);
+      const choices = preferred.length > 0 ? preferred : pickable;
+      if (choices.length > 0) {
+        landOn(choices[Math.floor(Math.random() * choices.length)], null, true);
+        return;
+      }
+      setCurrentSquad(null);
     },
-    [spins, ratingMode],
+    [spins],
   );
 
   const doSpin = useCallback(() => {
