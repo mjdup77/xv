@@ -25,22 +25,17 @@ export function StrengthPanel({
   hideRatings: boolean;
   filled: number;
 }) {
-  // Attacking output drives the 4-try bonus (mirrors the sim's attack power).
-  const ap =
-    facets.attack * 0.5 +
-    facets.control * 0.2 +
-    facets.setPiece * 0.15 +
-    facets.goalKick * 0.15 +
-    6;
+  // Try-scoring power drives the 4-try bonus (mirrors the sim's attack power).
+  const ap = facets.attack * 0.55 + facets.control * 0.25 + facets.setPiece * 0.2 + 4;
 
   const outlook =
     filled < 8
       ? null
-      : ap >= 97
+      : ap >= 94
         ? { label: "Genuine threat", cls: "hot" }
-        : ap >= 90
+        : ap >= 87
           ? { label: "In the hunt", cls: "warm" }
-          : ap >= 83
+          : ap >= 80
             ? { label: "Outside chance", cls: "cool" }
             : { label: "Long shot", cls: "cold" };
 

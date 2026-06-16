@@ -30,15 +30,15 @@ const ROUNDS: RoundCfg[] = [
     { name: "New Zealand", flag: "🇳🇿" }, { name: "South Africa", flag: "🇿🇦" } ] },
 ];
 
-// Attacking & defensive output of the XV. Pure player quality — no cohesion
-// bonus, since this is a draft game built from players across every era.
-// The flat constants preserve the historical difficulty curve after removing
-// the old chemistry term.
+const clampN = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v));
+
+// Try-scoring and try-stopping output of the XV. No cohesion bonus (this is a
+// draft across every era). Goal-kicking and discipline are deliberately NOT
+// here — they affect points/penalties, not how many tries you score or concede.
+// The flat constants preserve the difficulty curve after earlier rebalances.
 function powers(f: Facets) {
-  const attack =
-    f.attack * 0.5 + f.control * 0.2 + f.setPiece * 0.15 + f.goalKick * 0.15 + 6;
-  const defence =
-    f.defence * 0.55 + f.breakdown * 0.2 + f.setPiece * 0.15 + f.discipline * 0.1 + 4;
+  const attack = f.attack * 0.55 + f.control * 0.25 + f.setPiece * 0.2 + 4;
+  const defence = f.defence * 0.6 + f.breakdown * 0.25 + f.setPiece * 0.15 + 3;
   return { attack, defence };
 }
 
@@ -65,29 +65,43 @@ function simMatch(
   cfg: RoundCfg,
   attack: number,
   defence: number,
+  goalKick: number,
+  discipline: number,
   isKnockout: boolean,
   players: Player[],
   rng: Rng,
 ): MatchResult {
   const opp = rng.pick(cfg.pool);
-  const R = cfg.rating;
+  // A shared "day" swing: on an off day the opponent plays above themselves,
+  // which means fewer tries for you and more against — the source of upsets.
+  const R = cfg.rating + rng.normal(0, 6.5);
 
-  const base = 17;
-  const k = 0.62;
-  let pf = base + k * (attack - R) + rng.normal(0, 7);
-  let pa = base + k * (R - defence) + rng.normal(0, 7);
-  pf = Math.max(0, Math.round(pf));
-  pa = Math.max(0, Math.round(pa));
-
+  // 1) Tries — the foundation everything else is built on.
   let tries = Math.round((attack - R) * 0.09 + 2.4 + rng.normal(0, 1.0));
   tries = Math.max(0, Math.min(9, tries));
   let triesAg = Math.round((R - defence) * 0.09 + 2.0 + rng.normal(0, 1.0));
   triesAg = Math.max(0, Math.min(9, triesAg));
 
+  // 2) Goal-kicking turns tries into conversions and infringements into points.
+  const ourKick = clampN(0.5, 0.92, 0.5 + (goalKick - 72) * 0.013);
+  const convF = Math.round(tries * ourKick);
+  const penChancesF = Math.max(0, Math.round(rng.normal(2.2 + (R - 80) * 0.03, 1.0)));
+  const penF = Math.round(penChancesF * Math.max(0.5, ourKick));
+  const dropF = rng.next() < 0.1 ? 1 : 0;
+  let pf = tries * 5 + convF * 2 + penF * 3 + dropF * 3;
+
+  // 3) Opponent scores off their tries + generic kicking. Our discipline cuts
+  //    the penalties we give away.
+  const convA = Math.round(triesAg * 0.72);
+  const penChancesA = Math.max(0, Math.round(rng.normal(2.2 - (discipline - 80) * 0.045, 1.0)));
+  const penA = Math.round(penChancesA * 0.74);
+  const dropA = rng.next() < 0.08 ? 1 : 0;
+  let pa = triesAg * 5 + convA * 2 + penA * 3 + dropA * 3;
+
   let won = pf > pa;
   let draw = pf === pa;
 
-  // Knockouts cannot end level — settle in extra time.
+  // Knockouts cannot end level — settle it with a late kick.
   if (draw && isKnockout) {
     const edge = (attack + defence) / 2 - R + rng.normal(0, 6);
     if (edge >= 0) {
@@ -230,72 +244,97 @@ function deriveReview(
   triesFor: number,
   triesAgainst: number,
 ): { wentWell: string[]; lessons: string[] } {
-  const named: [string, number][] = [
+  const r = (n: number) => Math.round(n);
+
+  // The units that actually create tries (and therefore bonus points).
+  const tryDrivers: [string, number][] = [
+    ["attack", f.attack],
+    ["midfield control", f.control],
     ["set-piece", f.setPiece],
-    ["breakdown work", f.breakdown],
+  ];
+  const weakestTry = [...tryDrivers].sort((a, b) => a[1] - b[1])[0];
+
+  // Every facet, for picking the single standout.
+  const all: [string, number][] = [
+    ["set-piece", f.setPiece],
+    ["breakdown", f.breakdown],
     ["defence", f.defence],
     ["attack", f.attack],
     ["midfield control", f.control],
     ["goal-kicking", f.goalKick],
   ];
-  const byVal = [...named].sort((a, b) => b[1] - a[1]);
-  const best = byVal[0];
-  const weakest = byVal[byVal.length - 1];
-  const flavour: Record<string, string> = {
-    "set-piece": "your scrum and lineout gave a rock-solid platform",
-    "breakdown work": "you owned the breakdown and feasted on turnover ball",
-    defence: `you strangled teams — only ${triesAgainst} tries conceded all tournament`,
-    attack: `you played with width and pace — ${triesFor} tries in 7 matches`,
-    "midfield control": "your 9-10 axis dictated tempo and territory",
-    "goal-kicking": "you punished every infringement off the tee",
+  const best = [...all].sort((a, b) => b[1] - a[1])[0];
+  const effect: Record<string, string> = {
+    "set-piece": "a dominant scrum and lineout gave you the platform to attack",
+    breakdown: "you won the collisions and lived off turnover ball",
+    defence: `you smothered teams — only ${triesAgainst} tries conceded all tournament`,
+    attack: `you cut teams open — ${triesFor} tries scored across the run`,
+    "midfield control": "your 9-10 axis owned territory and tempo",
+    "goal-kicking": "you turned pressure into points off the tee",
   };
 
-  const wentWell: string[] = [];
-  wentWell.push(
-    `Your ${best[0]} (${Math.round(best[1])}) was the standout — ${flavour[best[0]]}.`,
-  );
+  const wentWell: string[] = [
+    `Your ${best[0]} (${r(best[1])}) led the way — ${effect[best[0]]}.`,
+  ];
   const bp = matches.filter((m) => m.bonusPoint).length;
-  if (bp >= 4) wentWell.push(`You racked up ${bp} bonus-point wins — relentless scoring.`);
-  else if (byVal[1][1] >= 86)
-    wentWell.push(`Your ${byVal[1][0]} (${Math.round(byVal[1][1])}) backed it up nicely.`);
+  if (bp >= 4)
+    wentWell.push(`You banked ${bp} try-bonus points off ${triesFor} tries — ruthless.`);
 
   const lessons: string[] = [];
   if (flags.perfect35) {
     lessons.push("Flawless. There is no level beyond this.");
     return { wentWell, lessons };
   }
+
   if (flags.champion) {
-    const noBp = matches.filter((m) => !m.bonusPoint).length;
-    lessons.push(`World Cup won — but the 4-try bonus escaped you in ${noBp} of 7 games.`);
+    const bpGames = matches.filter((m) => m.bonusPoint).length;
     lessons.push(
-      `Your ${weakest[0]} (${Math.round(weakest[1])}) is the unit holding back a Perfect 35 — load up there and hunt four tries a game.`,
+      `World Cup won — but you scored four-plus tries in only ${bpGames} of 7 games, so the Perfect 35 slipped away.`,
+    );
+    lessons.push(
+      `Bonus points come from tries, and ${weakestTry[0]} (${r(weakestTry[1])}) is your weakest try-scoring unit — strengthen it to cross the line more often.`,
     );
     return { wentWell, lessons };
   }
+
   if (!flags.advancedFromPool) {
-    lessons.push("You couldn't escape the pool — the results just didn't fall your way.");
-    lessons.push(
-      `Your ${weakest[0]} (${Math.round(weakest[1])}) was the softest link — prioritise it next draft.`,
-    );
+    if (triesAgainst >= triesFor) {
+      lessons.push(
+        `You went out of the pool leaking tries — ${triesAgainst} conceded against ${triesFor} scored.`,
+      );
+      lessons.push(
+        `Tighten your defence (${r(f.defence)}) and breakdown (${r(f.breakdown)}) — draft a harder-working back row and centres.`,
+      );
+    } else {
+      lessons.push(`You couldn't put pool teams away — too few tries when it mattered.`);
+      lessons.push(
+        `Add attacking punch: ${weakestTry[0]} (${r(weakestTry[1])}) is your softest try-scoring unit.`,
+      );
+    }
     return { wentWell, lessons };
   }
+
+  // Knockout exit — diagnose THAT defeat, with a clear cause → fix.
   const loss = matches[matches.length - 1];
   const margin = loss.pa - loss.pf;
   lessons.push(
     `Your run ended in the ${loss.round.toLowerCase()}, ${loss.pf}–${loss.pa} to ${loss.opponent}.`,
   );
-  if (loss.triesAg >= 3)
+  if (loss.triesAg >= 3 || f.defence <= f.attack - 4) {
     lessons.push(
-      `They crossed ${loss.triesAg} times — a meaner defensive spine (back row & centres) is the fix.`,
+      `You leaked ${loss.triesAg} tries that day — a tougher defence (${r(f.defence)}) is the fix: a meaner back row and centres.`,
     );
-  else if (loss.tries <= 1)
-    lessons.push("You couldn't break them down — add a genuine strike finisher out wide.");
-  else if (margin <= 4 && f.goalKick < 88)
-    lessons.push("Decided by a kick or two — an elite goal-kicker (10 or 15) wins these.");
-  else
+  } else if (loss.tries <= 1 || f.attack <= f.defence - 4) {
     lessons.push(
-      `Marginal gains in your ${weakest[0]} (${Math.round(weakest[1])}) would have tipped it.`,
+      `You managed only ${loss.tries} ${loss.tries === 1 ? "try" : "tries"} — more attacking threat would unlock them (weakest: ${weakestTry[0]}, ${r(weakestTry[1])}).`,
     );
+  } else if (margin <= 5 && f.goalKick < 86) {
+    lessons.push(
+      `Lost by ${margin} — a sharper goal-kicker (${r(f.goalKick)}) turns these tight games your way.`,
+    );
+  } else {
+    lessons.push("It was tight everywhere — small upgrades across the spine get you over the line.");
+  }
   return { wentWell, lessons };
 }
 
@@ -310,7 +349,7 @@ export function simulate(lineup: Lineup, seed: string): TournamentResult {
 
   // Pool stage (first 4).
   for (let i = 0; i < 4; i++) {
-    const m = simMatch(ROUNDS[i], attack, defence, false, players, rng);
+    const m = simMatch(ROUNDS[i], attack, defence, f.goalKick, f.discipline, false, players, rng);
     matches.push(m);
     if (m.won) poolWins++;
   }
@@ -320,7 +359,7 @@ export function simulate(lineup: Lineup, seed: string): TournamentResult {
   if (advancedFromPool) {
     let alive = true;
     for (let i = 4; i < 7; i++) {
-      const m = simMatch(ROUNDS[i], attack, defence, true, players, rng);
+      const m = simMatch(ROUNDS[i], attack, defence, f.goalKick, f.discipline, true, players, rng);
       matches.push(m);
       if (!m.won) {
         alive = false;
