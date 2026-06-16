@@ -31,11 +31,11 @@ export function Result({ result, lineup, seed, onPlayAgain }: Props) {
         ? "knockout"
         : "pool";
 
-  const adviceTitle = result.perfect35
+  const lessonsTitle = result.perfect35
     ? "Immortal"
     : result.champion
       ? "Chasing the Perfect 35"
-      : "Why your run ended";
+      : "Where it slipped";
 
   const share = () => {
     const line = result.perfect35
@@ -138,13 +138,32 @@ export function Result({ result, lineup, seed, onPlayAgain }: Props) {
         </div>
       </div>
 
-      <div className={`advice ${klass}`}>
-        <h3>{adviceTitle}</h3>
-        <ul>
-          {result.advice.map((a, i) => (
-            <li key={i}>{a}</li>
+      <div className="headlines">
+        <h3>Tournament Headlines</h3>
+        <ul className="fun-facts">
+          {result.funFacts.map((s, i) => (
+            <li key={i}>{s}</li>
           ))}
         </ul>
+      </div>
+
+      <div className="review-cols">
+        <div className="review-card good">
+          <h4>What went well</h4>
+          <ul>
+            {result.review.wentWell.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        </div>
+        <div className={`review-card ${result.perfect35 ? "good" : "work"}`}>
+          <h4>{lessonsTitle}</h4>
+          <ul>
+            {result.review.lessons.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        </div>
       </div>
 
       <div className="result-pitch">

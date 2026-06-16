@@ -1,6 +1,9 @@
-import type { Lineup, MatchResult, Player, TournamentResult } from "../types";
-import { computeFacets, type Facets } from "./ratings";
+import type { Lineup, MatchResult, Player, SlotId, TournamentResult } from "../types";
+import { computeFacets, getAttrs, type Facets } from "./ratings";
 import { Rng } from "./rng";
+
+// Most tries by one player in a single Rugby World Cup tournament.
+const RWC_TRY_RECORD = 8; // Jonah Lomu (1999) & Bryan Habana (2007)
 
 const BACK_ROLES = ["scrumhalf", "flyhalf", "centre", "wing", "fullback"];
 
@@ -131,6 +134,167 @@ function deriveIdentity(f: Facets): string {
   return top[0];
 }
 
+function deriveStats(
+  lineup: Lineup,
+  matches: MatchResult[],
+  triesFor: number,
+  seed: string,
+): {
+  topScorer: { name: string; points: number; goalPct: number };
+  topTryScorer: { name: string; tries: number; note: string };
+  funFacts: string[];
+} {
+  const rng = new Rng(seed + ":stats");
+  const ents = (Object.keys(lineup) as SlotId[])
+    .filter((s) => lineup[s])
+    .map((s) => ({ slot: s, p: lineup[s]!, a: getAttrs(lineup[s]!) }));
+  if (ents.length === 0) {
+    return {
+      topScorer: { name: "", points: 0, goalPct: 0 },
+      topTryScorer: { name: "", tries: 0, note: "" },
+      funFacts: [],
+    };
+  }
+  const totalPF = matches.reduce((s, m) => s + m.pf, 0);
+
+  // Goal-kicker → tournament points (conversions + penalties + drops).
+  const kicker = ents.reduce((b, c) => (c.a.goalKick > b.a.goalKick ? c : b));
+  const kickPoints = Math.max(0, totalPF - triesFor * 5);
+  const goalPct = Math.max(
+    60,
+    Math.min(96, Math.round(68 + (kicker.a.goalKick - 80) * 1.05 + rng.normal(0, 1.2))),
+  );
+  const topScorer = { name: kicker.p.name, points: Math.round(kickPoints), goalPct };
+
+  // Top try-scorer among the finishers.
+  const finisherSlots: SlotId[] = ["LW", "RW", "FB", "OC", "IC", "N8"];
+  const fins = ents.filter((e) => finisherSlots.includes(e.slot));
+  const pool = fins.length ? fins : ents;
+  let top = pool[0];
+  let topW = -1;
+  for (const e of pool) {
+    const w =
+      e.a.pace * 0.5 +
+      e.a.carry * 0.3 +
+      e.p.ovr * 0.2 +
+      (["LW", "RW", "FB"].includes(e.slot) ? 6 : 0);
+    if (w > topW) {
+      topW = w;
+      top = e;
+    }
+  }
+  let tt = Math.round(triesFor * (0.3 + rng.next() * 0.07));
+  tt = Math.max(2, Math.min(triesFor, tt));
+  let note: string;
+  if (tt > RWC_TRY_RECORD) note = "a brand-new single-tournament World Cup record!";
+  else if (tt === RWC_TRY_RECORD) note = "equalling the all-time World Cup record!";
+  else if (tt === RWC_TRY_RECORD - 1)
+    note = `one shy of the all-time World Cup record (${RWC_TRY_RECORD}).`;
+  else note = "your tournament's top finisher.";
+  const topTryScorer = { name: top.p.name, tries: tt, note };
+
+  const wall = ents.reduce((b, c) => (c.a.defence > b.a.defence ? c : b));
+  const tacklePct = Math.max(
+    78,
+    Math.min(97, Math.round(82 + (wall.a.defence - 80) * 0.7 + rng.normal(0, 1))),
+  );
+  const horse = ents.reduce((b, c) => (c.a.carry > b.a.carry ? c : b));
+  const carries = Math.max(
+    40,
+    Math.round(58 + (horse.a.carry - 80) * 2.2 + rng.normal(0, 4)),
+  );
+  const villain = ents.reduce((b, c) => (c.a.discipline < b.a.discipline ? c : b));
+  const pens = Math.max(
+    4,
+    Math.round(6 + (84 - villain.a.discipline) * 0.28 + rng.normal(0, 1)),
+  );
+
+  const funFacts = [
+    `${topScorer.name} top-scored the campaign with ${topScorer.points} points, ${goalPct}% off the tee.`,
+    `${top.p.name} bagged ${tt} tries — ${note}`,
+    `${wall.p.name} was a brick wall: ${tacklePct}% tackle success across the run.`,
+    `${horse.p.name} did the hard yards with a squad-high ${carries} carries.`,
+    `${villain.p.name} tested the ref's patience — ${pens} penalties conceded.`,
+  ];
+  return { topScorer, topTryScorer, funFacts };
+}
+
+function deriveReview(
+  f: Facets,
+  matches: MatchResult[],
+  flags: { advancedFromPool: boolean; champion: boolean; perfect35: boolean },
+  triesFor: number,
+  triesAgainst: number,
+): { wentWell: string[]; lessons: string[] } {
+  const named: [string, number][] = [
+    ["set-piece", f.setPiece],
+    ["breakdown work", f.breakdown],
+    ["defence", f.defence],
+    ["attack", f.attack],
+    ["midfield control", f.control],
+    ["goal-kicking", f.goalKick],
+  ];
+  const byVal = [...named].sort((a, b) => b[1] - a[1]);
+  const best = byVal[0];
+  const weakest = byVal[byVal.length - 1];
+  const flavour: Record<string, string> = {
+    "set-piece": "your scrum and lineout gave a rock-solid platform",
+    "breakdown work": "you owned the breakdown and feasted on turnover ball",
+    defence: `you strangled teams — only ${triesAgainst} tries conceded all tournament`,
+    attack: `you played with width and pace — ${triesFor} tries in 7 matches`,
+    "midfield control": "your 9-10 axis dictated tempo and territory",
+    "goal-kicking": "you punished every infringement off the tee",
+  };
+
+  const wentWell: string[] = [];
+  wentWell.push(
+    `Your ${best[0]} (${Math.round(best[1])}) was the standout — ${flavour[best[0]]}.`,
+  );
+  const bp = matches.filter((m) => m.bonusPoint).length;
+  if (bp >= 4) wentWell.push(`You racked up ${bp} bonus-point wins — relentless scoring.`);
+  else if (byVal[1][1] >= 86)
+    wentWell.push(`Your ${byVal[1][0]} (${Math.round(byVal[1][1])}) backed it up nicely.`);
+
+  const lessons: string[] = [];
+  if (flags.perfect35) {
+    lessons.push("Flawless. There is no level beyond this.");
+    return { wentWell, lessons };
+  }
+  if (flags.champion) {
+    const noBp = matches.filter((m) => !m.bonusPoint).length;
+    lessons.push(`World Cup won — but the 4-try bonus escaped you in ${noBp} of 7 games.`);
+    lessons.push(
+      `Your ${weakest[0]} (${Math.round(weakest[1])}) is the unit holding back a Perfect 35 — load up there and hunt four tries a game.`,
+    );
+    return { wentWell, lessons };
+  }
+  if (!flags.advancedFromPool) {
+    lessons.push("You couldn't escape the pool — the results just didn't fall your way.");
+    lessons.push(
+      `Your ${weakest[0]} (${Math.round(weakest[1])}) was the softest link — prioritise it next draft.`,
+    );
+    return { wentWell, lessons };
+  }
+  const loss = matches[matches.length - 1];
+  const margin = loss.pa - loss.pf;
+  lessons.push(
+    `Your run ended in the ${loss.round.toLowerCase()}, ${loss.pf}–${loss.pa} to ${loss.opponent}.`,
+  );
+  if (loss.triesAg >= 3)
+    lessons.push(
+      `They crossed ${loss.triesAg} times — a meaner defensive spine (back row & centres) is the fix.`,
+    );
+  else if (loss.tries <= 1)
+    lessons.push("You couldn't break them down — add a genuine strike finisher out wide.");
+  else if (margin <= 4 && f.goalKick < 88)
+    lessons.push("Decided by a kick or two — an elite goal-kicker (10 or 15) wins these.");
+  else
+    lessons.push(
+      `Marginal gains in your ${weakest[0]} (${Math.round(weakest[1])}) would have tipped it.`,
+    );
+  return { wentWell, lessons };
+}
+
 export function simulate(lineup: Lineup, seed: string): TournamentResult {
   const f = computeFacets(lineup);
   const { attack, defence } = powers(f);
@@ -205,6 +369,14 @@ export function simulate(lineup: Lineup, seed: string): TournamentResult {
     perfect35,
     triesAgainst,
   });
+  const stats = deriveStats(lineup, matches, triesFor, seed);
+  const review = deriveReview(
+    f,
+    matches,
+    { advancedFromPool, champion, perfect35 },
+    triesFor,
+    triesAgainst,
+  );
 
   return {
     matches,
@@ -221,6 +393,10 @@ export function simulate(lineup: Lineup, seed: string): TournamentResult {
     triesAgainst,
     stalwarts,
     advice,
+    topScorer: stats.topScorer,
+    topTryScorer: stats.topTryScorer,
+    funFacts: stats.funFacts,
+    review,
   };
 }
 

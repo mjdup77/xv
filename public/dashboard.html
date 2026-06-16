@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>XV — Usage Dashboard</title>
+    <style>
+      :root {
+        --bg: #0c1410; --panel: #14211a; --panel2: #1b2c22; --line: #27392e;
+        --text: #e8f0ea; --muted: #8aa394; --gold: #f5c451;
+        --green: #57c47a; --red: #e0654f; --blue: #5aa9e6;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 80px; }
+      h1 { font-size: 24px; margin: 0 0 2px; }
+      h1 .dot { color: var(--gold); }
+      .sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 28px 0 12px; }
+      .gate { max-width: 360px; margin: 80px auto; text-align: center; }
+      .gate input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line);
+        background: var(--panel); color: var(--text); font-size: 15px; margin: 14px 0; }
+      .btn { background: var(--gold); color: #1a1205; border: none; border-radius: 10px; padding: 11px 18px;
+        font-weight: 700; font-size: 14px; cursor: pointer; }
+      .btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+      .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+      .card b { display: block; font-size: 30px; line-height: 1; color: var(--gold); }
+      .card .sm { color: var(--green); }
+      .card span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+      .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+      .grid2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+      @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+      .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+      .bar-row .lbl { width: 120px; color: var(--muted); flex-shrink: 0; }
+      .bar-track { flex: 1; background: var(--panel2); border-radius: 6px; height: 16px; overflow: hidden; }
+      .bar-fill { height: 100%; background: var(--gold); border-radius: 6px; }
+      .bar-row .val { width: 54px; text-align: right; }
+      .funnel .bar-fill { background: var(--blue); }
+      .chart { display: flex; align-items: flex-end; gap: 4px; height: 140px; padding-top: 8px; }
+      .chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+      .chart .colbar { width: 100%; background: var(--green); border-radius: 4px 4px 0 0; min-height: 2px; }
+      .chart .colx { font-size: 9px; color: var(--muted); white-space: nowrap; transform: rotate(-45deg); transform-origin: top left; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+      th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+      .topbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+      .muted { color: var(--muted); font-size: 12px; }
+      .err { color: var(--red); margin-top: 10px; }
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--panel2); font-size: 11px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div id="gate" class="gate">
+        <h1>XV<span class="dot">.</span> Dashboard</h1>
+        <p class="muted">Enter your access key to view usage.</p>
+        <input id="key" type="password" placeholder="Access key" autocomplete="off" />
+        <button class="btn" onclick="saveKey()">View dashboard</button>
+        <div id="gateErr" class="err"></div>
+      </div>
+
+      <div id="app" style="display:none">
+        <div class="topbar">
+          <div>
+            <h1>XV<span class="dot">.</span> Usage</h1>
+            <div class="sub" id="meta">Loading…</div>
+          </div>
+          <div>
+            <button class="btn ghost" onclick="load()">Refresh</button>
+            <button class="btn ghost" onclick="logout()">Sign out</button>
+          </div>
+        </div>
+
+        <div id="err" class="err"></div>
+
+        <h2>Headline</h2>
+        <div class="cards" id="cards"></div>
+
+        <h2>Daily active users</h2>
+        <div class="panel"><div class="chart" id="chart"></div></div>
+
+        <div class="grid2" style="margin-top:16px">
+          <div>
+            <h2>Acquisition → retention funnel</h2>
+            <div class="panel funnel" id="funnel"></div>
+          </div>
+          <div>
+            <h2>Settings mix</h2>
+            <div class="panel" id="breakdowns"></div>
+          </div>
+        </div>
+
+        <h2>Recent runs</h2>
+        <div class="panel" style="overflow-x:auto"><table id="runs"></table></div>
+      </div>
+    </div>
+
+    <script>
+      const KEY_LS = "xv_stats_key";
+      function saveKey() {
+        const k = document.getElementById("key").value.trim();
+        if (!k) return;
+        localStorage.setItem(KEY_LS, k);
+        load();
+      }
+      function logout() {
+        localStorage.removeItem(KEY_LS);
+        location.reload();
+      }
+      function pct(n) { return (n * 100).toFixed(1) + "%"; }
+      function el(tag, cls, html) {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (html != null) e.innerHTML = html;
+        return e;
+      }
+      function bars(container, entries, cls) {
+        container.innerHTML = "";
+        const max = Math.max(1, ...entries.map((e) => e[1]));
+        for (const [lbl, val] of entries) {
+          const row = el("div", "bar-row" + (cls ? " " + cls : ""));
+          row.appendChild(el("div", "lbl", lbl));
+          const track = el("div", "bar-track");
+          const fill = el("div", "bar-fill");
+          fill.style.width = Math.max(2, (val / max) * 100) + "%";
+          track.appendChild(fill);
+          row.appendChild(track);
+          row.appendChild(el("div", "val", String(val)));
+          container.appendChild(row);
+        }
+      }
+
+      async function load() {
+        const k = localStorage.getItem(KEY_LS);
+        if (!k) return;
+        document.getElementById("gate").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        const errBox = document.getElementById("err");
+        errBox.textContent = "";
+        try {
+          const res = await fetch("/api/stats?key=" + encodeURIComponent(k));
+          if (res.status === 401) {
+            localStorage.removeItem(KEY_LS);
+            document.getElementById("gate").style.display = "block";
+            document.getElementById("app").style.display = "none";
+            document.getElementById("gateErr").textContent = "Invalid key.";
+            return;
+          }
+          const d = await res.json();
+          if (d.error) { errBox.textContent = "Error: " + d.error; return; }
+          render(d);
+        } catch (e) {
+          errBox.textContent = "Failed to load: " + e;
+        }
+      }
+
+      function render(d) {
+        const t = d.totals, r = d.rates;
+        document.getElementById("meta").textContent =
+          "Updated " + new Date(d.generatedAt).toLocaleString() + " · " + t.events + " events";
+
+        const cards = [
+          ["Players", t.users, null],
+          ["Sessions", t.sessions, null],
+          ["Runs started", t.runsStarted, null],
+          ["Draft completion", pct(r.draftCompletion), "sm"],
+          ["Run completion", pct(r.runCompletion), "sm"],
+          ["Champions", t.champions, null],
+          ["Perfect 35s", t.perfect35, null],
+          ["Win rate", pct(r.winRate), "sm"],
+          ["Shares", t.shares, null],
+          ["Share rate", pct(r.shareRate), "sm"],
+        ];
+        const cc = document.getElementById("cards");
+        cc.innerHTML = "";
+        for (const [lbl, val, cls] of cards) {
+          const c = el("div", "card");
+          c.appendChild(el("b", cls || "", String(val)));
+          c.appendChild(el("span", "", lbl));
+          cc.appendChild(c);
+        }
+
+        // Daily chart (last 30 days)
+        const days = d.dailyActive.slice(-30);
+        const chart = document.getElementById("chart");
+        chart.innerHTML = "";
+        const maxU = Math.max(1, ...days.map((x) => x.users));
+        if (!days.length) chart.appendChild(el("div", "muted", "No activity yet."));
+        for (const day of days) {
+          const col = el("div", "col");
+          const bar = el("div", "colbar");
+          bar.style.height = (day.users / maxU) * 120 + "px";
+          bar.title = day.day + ": " + day.users + " users, " + day.runs + " runs";
+          col.appendChild(bar);
+          col.appendChild(el("div", "colx", day.day.slice(5)));
+          chart.appendChild(col);
+        }
+
+        bars(
+          document.getElementById("funnel"),
+          d.funnel.map((s) => [s.step, s.count]),
+          "funnel",
+        );
+
+        const bd = document.getElementById("breakdowns");
+        bd.innerHTML = "";
+        for (const [title, obj] of [
+          ["Difficulty", d.breakdowns.difficulty],
+          ["Era", d.breakdowns.era],
+          ["Ratings", d.breakdowns.ratingMode],
+        ]) {
+          bd.appendChild(el("div", "muted", title));
+          const holder = el("div");
+          bars(holder, Object.entries(obj).sort((a, b) => b[1] - a[1]));
+          bd.appendChild(holder);
+        }
+
+        const tbl = document.getElementById("runs");
+        tbl.innerHTML =
+          "<tr><th>When</th><th>Result</th><th>Score</th><th>Diff</th><th>Era</th><th>Ratings</th></tr>";
+        for (const run of d.recentRuns) {
+          const tr = el("tr");
+          tr.innerHTML =
+            "<td>" + (run.ts ? new Date(run.ts).toLocaleString() : "—") + "</td>" +
+            "<td>" + run.verdict + "</td>" +
+            "<td>" + run.score + "/35</td>" +
+            "<td><span class='pill'>" + (run.difficulty || "—") + "</span></td>" +
+            "<td><span class='pill'>" + (run.era || "—") + "</span></td>" +
+            "<td><span class='pill'>" + (run.rating_mode || "—") + "</span></td>";
+          tbl.appendChild(tr);
+        }
+        if (!d.recentRuns.length)
+          tbl.innerHTML = "<tr><td class='muted'>No completed runs yet.</td></tr>";
+      }
+
+      // Auto-refresh every 60s while open.
+      setInterval(() => {
+        if (localStorage.getItem(KEY_LS)) load();
+      }, 60000);
+
+      if (localStorage.getItem(KEY_LS)) load();
+    </script>
+  </body>
+</html>

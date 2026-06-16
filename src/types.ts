@@ -102,4 +102,9 @@ export interface TournamentResult {
   triesAgainst: number;
   stalwarts: { name: string; awards: number; ovr: number }[];
   advice: string[];
+  // Fun, narrative tournament stats.
+  topScorer: { name: string; points: number; goalPct: number };
+  topTryScorer: { name: string; tries: number; note: string };
+  funFacts: string[];
+  review: { wentWell: string[]; lessons: string[] };
 }
