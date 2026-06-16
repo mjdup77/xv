@@ -62,6 +62,7 @@ async function readAllEvents(token: string): Promise<Ev[]> {
 function aggregate(events: Ev[]) {
   const eventCounts: Record<string, number> = {};
   const users = new Set<string>();
+  const userCounts: Record<string, number> = {};
   const sessions = new Set<string>();
   const byDayUsers: Record<string, Set<string>> = {};
   const byDayRuns: Record<string, number> = {};
@@ -94,7 +95,7 @@ function aggregate(events: Ev[]) {
 
   for (const e of events) {
     inc(eventCounts, e.event);
-    if (e.user_id) users.add(e.user_id);
+    if (e.user_id) { users.add(e.user_id); inc(userCounts, e.user_id); }
     if (e.session_id) sessions.add(e.session_id);
     const d = dayOf(e);
     (byDayUsers[d] ||= new Set()).add(e.user_id || e.session_id || "?");
@@ -205,6 +206,9 @@ function aggregate(events: Ev[]) {
     sources,
     eventCounts,
     countries,
+    userIds: Object.entries(userCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, events]) => ({ id, events })),
     recentRuns: recentRuns.slice(0, 25),
   };
 }
