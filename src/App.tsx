@@ -429,6 +429,10 @@ export default function App() {
         </div>
       </header>
 
+      {filled > 0 && (
+        <StrengthPanel facets={proj} hideRatings={hideRatings} filled={filled} />
+      )}
+
       <div className="draft-body">
         <div className="draft-pitch">
           <Pitch
@@ -457,9 +461,6 @@ export default function App() {
             !isComplete && (
               <div className="pitch-tip">Tip: tap a player on the pitch to move them.</div>
             )
-          )}
-          {filled > 0 && (
-            <StrengthPanel facets={proj} hideRatings={hideRatings} filled={filled} />
           )}
         </div>
 

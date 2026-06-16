@@ -6,7 +6,7 @@ const FACETS: [keyof Facets, string][] = [
   ["defence", "Defence"],
   ["attack", "Attack"],
   ["control", "Control"],
-  ["goalKick", "Goal-kicking"],
+  ["goalKick", "Kicking"],
 ];
 
 function tier(v: number): string {
@@ -36,44 +36,45 @@ export function StrengthPanel({
   const outlook =
     filled < 8
       ? null
-      : ap >= 95
+      : ap >= 97
         ? { label: "Genuine threat", cls: "hot" }
-        : ap >= 88
+        : ap >= 90
           ? { label: "In the hunt", cls: "warm" }
-          : ap >= 80
+          : ap >= 83
             ? { label: "Outside chance", cls: "cool" }
             : { label: "Long shot", cls: "cold" };
 
   return (
-    <div className="strength">
-      <div className="strength-head">
-        <span>Squad Strength</span>
-        {outlook && (
-          <span
-            className={`bp-outlook ${outlook.cls}`}
-            title="How likely you are to score the 4-try bonus point in tough games"
-          >
-            Try-bonus: {outlook.label}
-          </span>
-        )}
-      </div>
-      <div className="strength-bars">
+    <div className="strength-strip">
+      <span className="ss-title">Squad strength</span>
+      <div className="ss-facets">
         {FACETS.map(([k, label]) => {
           const v = facets[k] as number;
           return (
-            <div className="sbar" key={k}>
-              <span className="sbar-label">{label}</span>
-              <div className="sbar-track">
+            <div className="sfacet" key={k} title={`${label}: ${Math.round(v)}`}>
+              <div className="sf-top">
+                <span className="sf-label">{label}</span>
+                {!hideRatings && <span className="sf-val">{Math.round(v)}</span>}
+              </div>
+              <div className="sf-track">
                 <div
-                  className={`sbar-fill ${tier(v)}`}
-                  style={{ width: `${Math.max(3, Math.min(100, v))}%` }}
+                  className={`sf-fill ${tier(v)}`}
+                  style={{ width: `${Math.max(4, Math.min(100, v))}%` }}
                 />
               </div>
-              <span className="sbar-val">{hideRatings ? "" : Math.round(v)}</span>
             </div>
           );
         })}
       </div>
+      {outlook && (
+        <div
+          className={`sf-outlook ${outlook.cls}`}
+          title="Your chance of scoring the 4-try bonus point in tough games — the key to the Perfect 35"
+        >
+          <span className="sfo-label">Try-bonus</span>
+          <span className="sfo-val">{outlook.label}</span>
+        </div>
+      )}
     </div>
   );
 }
