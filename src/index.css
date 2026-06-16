@@ -76,7 +76,24 @@ button { font-family: inherit; cursor: pointer; }
 .seg-btn.active { background: linear-gradient(180deg, var(--gold), var(--gold-deep)); color: #1a1206; }
 .difficulty-blurb { font-size: 13px; color: var(--muted); }
 
-.home-actions { display: flex; gap: 14px; justify-content: center; margin-bottom: 34px; }
+.home-actions { display: flex; gap: 14px; justify-content: center; margin-bottom: 10px; }
+.home-daily-note { text-align: center; font-size: 12.5px; margin: 0 0 30px; }
+.challenge-banner {
+  background: linear-gradient(160deg, rgba(212,175,55,0.16), rgba(212,175,55,0.05));
+  border: 1px solid rgba(212,175,55,0.5);
+  border-radius: 16px; padding: 20px; margin-bottom: 28px; text-align: center;
+}
+.challenge-banner .cb-title { font-weight: 800; font-size: 18px; margin-bottom: 6px; }
+.challenge-banner .cb-detail { font-size: 15px; margin-bottom: 14px; }
+.challenge-banner .cb-detail b { color: var(--gold, #d4af37); }
+.challenge-banner .cb-note { font-size: 12.5px; margin-top: 10px; }
+.challenge-result {
+  border-radius: 14px; padding: 14px 18px; margin-bottom: 18px; text-align: center;
+  font-weight: 700; font-size: 16px; border: 1px solid var(--line);
+}
+.challenge-result.win { background: rgba(46,160,90,0.16); border-color: rgba(46,160,90,0.5); }
+.challenge-result.tie { background: rgba(212,175,55,0.14); border-color: rgba(212,175,55,0.45); }
+.challenge-result.loss { background: rgba(200,70,70,0.13); border-color: rgba(200,70,70,0.4); }
 .home-how { border-top: 1px solid var(--line); padding-top: 22px; font-size: 14px; line-height: 1.5; }
 .home-how b { color: var(--text); }
 

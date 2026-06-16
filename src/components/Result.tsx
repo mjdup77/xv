@@ -2,15 +2,14 @@ import { useState } from "react";
 import type { Lineup, TournamentResult } from "../types";
 import { Pitch } from "./Pitch";
 import { track } from "../analytics";
-
-const SHARE_URL = "https://xv-7-0.vercel.app/";
-// Tagged variant so we can measure the viral loop (shares -> clicks -> users).
-const SHARE_LINK = `${SHARE_URL}?utm_source=share&utm_medium=result`;
+import { challengeLink, type Challenge } from "../challenge";
 
 interface Props {
   result: TournamentResult;
   lineup: Lineup;
   seed: string;
+  settings: { era: string; rating: string; diff: string };
+  challenge?: Challenge | null;
   onPlayAgain: () => void;
 }
 
@@ -27,7 +26,7 @@ function FacetBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function Result({ result, lineup, onPlayAgain }: Props) {
+export function Result({ result, lineup, seed, settings, challenge, onPlayAgain }: Props) {
   const klass = result.perfect35
     ? "perfect"
     : result.champion
@@ -44,13 +43,26 @@ export function Result({ result, lineup, onPlayAgain }: Props) {
 
   const [shared, setShared] = useState(false);
 
+  // Beat-my-score comparison when this run was an accepted challenge.
+  const beat = challenge ? result.perfectScore - challenge.score : null;
+
   const share = async () => {
-    const line = result.perfect35
-      ? `I built the PERFECT 35 on XV 🏆 — bonus-point wins in all 7 games to win the World Cup.`
+    const headline = result.perfect35
+      ? `I built the PERFECT 35 on XV 🏉🏆 — beat that if you can.`
       : result.champion
-        ? `I won the Rugby World Cup on XV 🏆 (Perfect score ${result.perfectScore}/35).`
-        : `${result.verdict} on XV. My run scored ${result.perfectScore}/35. Can you go all the way?`;
-    const text = `${line}\nPlay: ${SHARE_LINK}`;
+        ? `I won the Rugby World Cup on XV 🏉 with ${result.perfectScore}/35.`
+        : `I scored ${result.perfectScore}/35 on XV 🏉.`;
+    const line = `${headline} Same draft — can you beat me?`;
+    const link = challengeLink({
+      seed,
+      era: settings.era,
+      rating: settings.rating,
+      diff: settings.diff,
+      score: result.perfectScore,
+      verdict: result.verdict,
+      champion: result.champion,
+    });
+    const text = `${line}\n${link}`;
 
     const canNativeShare =
       typeof navigator !== "undefined" && typeof navigator.share === "function";
@@ -59,11 +71,12 @@ export function Result({ result, lineup, onPlayAgain }: Props) {
       champion: result.champion,
       perfect35: result.perfect35,
       perfect_score: result.perfectScore,
+      is_challenge: true,
     });
 
     try {
       if (canNativeShare) {
-        await navigator.share({ title: "XV", text: line, url: SHARE_LINK });
+        await navigator.share({ title: "XV — beat my draft", text: line, url: link });
         return;
       }
     } catch {
@@ -80,6 +93,17 @@ export function Result({ result, lineup, onPlayAgain }: Props) {
 
   return (
     <div className="result">
+      {challenge && beat !== null && (
+        <div
+          className={`challenge-result ${beat > 0 ? "win" : beat === 0 ? "tie" : "loss"}`}
+        >
+          {beat > 0
+            ? `🏆 You beat the challenge! ${result.perfectScore} vs their ${challenge.score}.`
+            : beat === 0
+              ? `🤝 Dead heat — ${result.perfectScore} apiece!`
+              : `So close — ${result.perfectScore} vs their ${challenge.score}. Re-spin and run it back.`}
+        </div>
+      )}
       <div className={`verdict ${klass}`}>
         {result.perfect35 && <div className="verdict-crown">PERFECT 35</div>}
         <h1>{result.verdict}</h1>
@@ -206,7 +230,7 @@ export function Result({ result, lineup, onPlayAgain }: Props) {
           New Run
         </button>
         <button className="btn ghost" onClick={share}>
-          {shared ? "Copied!" : "Share Result"}
+          {shared ? "Link copied!" : "Challenge a friend"}
         </button>
       </div>
     </div>

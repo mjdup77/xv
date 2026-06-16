@@ -20,6 +20,7 @@ import {
   squadHasPick,
 } from "./engine/draft";
 import { computeFacets, signatureTags } from "./engine/ratings";
+import { readIncomingChallenge, type Challenge } from "./challenge";
 import { StrengthPanel } from "./components/StrengthPanel";
 import { simulate } from "./engine/sim";
 import { Pitch } from "./components/Pitch";
@@ -79,6 +80,8 @@ export default function App() {
   const [ratingMode, setRatingMode] = useState<RatingMode>("seasonal");
   const [hideRatings, setHideRatings] = useState(false);
   const [result, setResult] = useState<TournamentResult | null>(null);
+  const [incomingChallenge, setIncomingChallenge] = useState<Challenge | null>(null);
+  const [activeChallenge, setActiveChallenge] = useState<Challenge | null>(null);
   const animRef = useRef<number | null>(null);
   const lastSquadIdRef = useRef<string | null>(null);
 
@@ -89,16 +92,39 @@ export default function App() {
 
   useEffect(() => {
     initAnalytics();
+    const c = readIncomingChallenge();
+    if (c) {
+      setIncomingChallenge(c);
+      // Reflect the challenge's settings in the home selectors for clarity.
+      if (c.diff in DIFFICULTY) setDifficulty(c.diff as Diff);
+      if (c.era in ERA) setEra(c.era as Era);
+      if (c.rating in RATING) setRatingMode(c.rating as RatingMode);
+      track("challenge_opened", { score: c.score, champion: c.champion });
+    }
   }, []);
 
   const startRun = useCallback(
-    (daily: boolean) => {
-      const cfg = DIFFICULTY[difficulty];
-      const s = daily ? todaySeed() : randomSeed();
-      startRunContext({ difficulty, era, rating_mode: ratingMode });
-      track("run_started", { mode: daily ? "daily" : "new", seed: s });
+    (opts?: { daily?: boolean; accept?: Challenge | null }) => {
+      const accept = opts?.accept ?? null;
+      // Accepting a challenge replays its exact seed AND settings for fairness.
+      const useDiff = (accept && accept.diff in DIFFICULTY ? accept.diff : difficulty) as Diff;
+      const useEra = (accept && accept.era in ERA ? accept.era : era) as Era;
+      const useRating = (accept && accept.rating in RATING ? accept.rating : ratingMode) as RatingMode;
+      const cfg = DIFFICULTY[useDiff];
+      const s = accept ? accept.seed : opts?.daily ? todaySeed() : randomSeed();
+      if (accept) {
+        setDifficulty(useDiff);
+        setEra(useEra);
+        setRatingMode(useRating);
+      }
+      setActiveChallenge(accept);
+      startRunContext({ difficulty: useDiff, era: useEra, rating_mode: useRating });
+      track("run_started", {
+        mode: accept ? "challenge" : opts?.daily ? "daily" : "new",
+        seed: s,
+      });
       setSeed(s);
-      setSpins(buildSpinSequence(s, 60, ERA[era].minYear, ratingMode));
+      setSpins(buildSpinSequence(s, 60, ERA[useEra].minYear, useRating));
       setSpinIndex(0);
       setLineup({});
       setPickedKeys(new Set());
@@ -315,6 +341,24 @@ export default function App() {
               <span>matches to glory</span>
             </div>
           </div>
+          {incomingChallenge && (
+            <div className="challenge-banner">
+              <div className="cb-title">🏉 You've been challenged!</div>
+              <div className="cb-detail">
+                A friend scored <b>{incomingChallenge.score}/35</b>
+                {incomingChallenge.champion ? " 🏆" : ""} on this exact draft.
+              </div>
+              <button
+                className="btn primary big"
+                onClick={() => startRun({ accept: incomingChallenge })}
+              >
+                Accept Challenge
+              </button>
+              <div className="cb-note muted">
+                Same squads, same settings — can you beat it?
+              </div>
+            </div>
+          )}
           <div className="difficulty">
             <span className="difficulty-label">Difficulty</span>
             <div className="seg">
@@ -365,13 +409,17 @@ export default function App() {
             <span className="difficulty-blurb">{RATING[ratingMode].blurb}</span>
           </div>
           <div className="home-actions">
-            <button className="btn primary big" onClick={() => startRun(false)}>
+            <button className="btn primary big" onClick={() => startRun()}>
               Start New Run
             </button>
-            <button className="btn ghost big" onClick={() => startRun(true)}>
-              Play Daily
+            <button className="btn ghost big" onClick={() => startRun({ daily: true })}>
+              Daily Challenge
             </button>
           </div>
+          <p className="muted home-daily-note">
+            Daily Challenge = the same draft for everyone today. Compare scores
+            with friends.
+          </p>
           <div className="home-how">
             <p>
               <b>Spin</b> a country + World Cup year → <b>draft</b> one player into your
@@ -398,7 +446,9 @@ export default function App() {
         result={result}
         lineup={lineup}
         seed={seed}
-        onPlayAgain={() => startRun(seed.startsWith("daily"))}
+        settings={{ era, rating: ratingMode, diff: difficulty }}
+        challenge={activeChallenge}
+        onPlayAgain={() => startRun({ daily: seed.startsWith("daily") })}
       />
     );
   }
