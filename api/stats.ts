@@ -63,6 +63,24 @@ async function readAllEvents(token: string): Promise<Ev[]> {
 // Read events from Postgres (preferred sink). One indexed query instead of
 // fetching every Blob object, so dashboard reads are cheap and scalable.
 async function readAllEventsPg(): Promise<Ev[]> {
+  // Create the table if the first event hasn't been written yet, so an empty
+  // store reads as zero events rather than erroring on a missing relation.
+  await sql`
+    create table if not exists events (
+      id           bigserial primary key,
+      received_at  timestamptz not null default now(),
+      client_ts    timestamptz,
+      user_id      text,
+      session_id   text,
+      run_id       text,
+      event        text not null,
+      difficulty   text,
+      era          text,
+      rating_mode  text,
+      country      text,
+      props        jsonb
+    )
+  `;
   const { rows } = await sql`
     select event, client_ts, received_at, user_id, session_id, run_id,
            difficulty, era, rating_mode, country, props
