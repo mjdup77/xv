@@ -742,7 +742,7 @@ export default function App() {
                         {!hideRatings && <span className="pr-ovr">{p.ovr}</span>}
                         <span className="pr-mid">
                           <span className="pr-name">{p.name}</span>
-                          {signatureTags(p).length > 0 && (
+                          {!hideRatings && signatureTags(p).length > 0 && (
                             <span className="pr-tags">
                               {signatureTags(p).map((t) => (
                                 <span className="pr-tag" key={t.label} title={t.label}>
