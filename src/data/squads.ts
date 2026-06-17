@@ -246,6 +246,12 @@ export const SQUADS: Squad[] = [
 
 export const ALL_PLAYERS: Player[] = SQUADS.flatMap((s) => s.players);
 
+// Fast lookup so a shared head-to-head link can rebuild an opponent's XV from
+// just the 15 player ids.
+export const PLAYER_BY_ID: Map<string, Player> = new Map(
+  ALL_PLAYERS.map((p) => [p.id, p]),
+);
+
 // ---- Rating mode: seasonal (as authored) vs prime (career-peak) ----
 export type RatingMode = "seasonal" | "prime";
 

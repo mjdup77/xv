@@ -107,3 +107,33 @@ export interface TournamentResult {
   funFacts: string[];
   review: { wentWell: string[]; lessons: string[] };
 }
+
+// ---- Head-to-head: two drafted XVs play a single 80-minute match ----
+export interface H2HTeam {
+  label: string;
+  overall: number;
+  tries: number;
+  cons: number;
+  pens: number;
+  drops: number;
+  points: number;
+  topUnit: { name: string; value: number };
+  tryScorers: string[];
+}
+
+export interface H2HMoment {
+  minute: number;
+  side: "home" | "away";
+  kind: "try" | "pen" | "drop";
+  text: string;
+}
+
+export interface H2HResult {
+  home: H2HTeam; // the player viewing the report
+  away: H2HTeam; // their opponent
+  homeWon: boolean;
+  draw: boolean;
+  motm: { name: string; team: string };
+  timeline: H2HMoment[];
+  headline: string;
+}

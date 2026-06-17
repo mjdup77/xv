@@ -1,4 +1,13 @@
-import type { Lineup, MatchResult, Player, SlotId, TournamentResult } from "../types";
+import type {
+  H2HMoment,
+  H2HResult,
+  H2HTeam,
+  Lineup,
+  MatchResult,
+  Player,
+  SlotId,
+  TournamentResult,
+} from "../types";
 import { computeFacets, getAttrs, type Facets } from "./ratings";
 import { Rng } from "./rng";
 
@@ -462,6 +471,231 @@ export function simulate(lineup: Lineup, seed: string): TournamentResult {
     funFacts: stats.funFacts,
     review,
   };
+}
+
+// ---- Head-to-head: two drafted XVs play one 80-minute match ----
+
+const FACET_NAMES: [keyof Facets, string][] = [
+  ["setPiece", "Set-piece"],
+  ["breakdown", "Breakdown"],
+  ["defence", "Defence"],
+  ["attack", "Attack"],
+  ["control", "Midfield control"],
+];
+
+function topUnit(f: Facets): { name: string; value: number } {
+  let name = "Attack";
+  let value = -1;
+  for (const [k, label] of FACET_NAMES) {
+    if (f[k] > value) {
+      value = f[k];
+      name = label;
+    }
+  }
+  return { name, value: Math.round(value) };
+}
+
+// Tries scored by an attack against a defence. Two evenly matched elite sides
+// land around 3 each; quality opens a margin, but the wider random spread keeps
+// a genuine upset on the table for a slightly weaker XV.
+function h2hTryCount(att: number, def: number, rng: Rng): number {
+  const t = Math.round(2.6 + (att - def) * 0.2 + rng.normal(0, 1.25));
+  return Math.max(0, Math.min(9, t));
+}
+
+function h2hKick(gk: number): number {
+  return clampN(0.5, 0.92, 0.5 + (gk - 72) * 0.013);
+}
+
+// Pick `n` try-scorers, weighting finishers (wings/fullback) and ball-carriers.
+function pickScorers(lineup: Lineup, n: number, rng: Rng): string[] {
+  const ents = (Object.keys(lineup) as SlotId[])
+    .filter((s) => lineup[s])
+    .map((s) => ({ s, p: lineup[s]!, a: getAttrs(lineup[s]!) }));
+  if (!ents.length) return [];
+  const wOf = (e: (typeof ents)[number]) => {
+    const fin = ["LW", "RW", "FB"].includes(e.s)
+      ? 8
+      : ["OC", "IC", "N8", "F7", "F6"].includes(e.s)
+        ? 3
+        : 0.6;
+    return (e.a.pace * 0.5 + e.a.carry * 0.3 + e.p.ovr * 0.2) * 0.05 + fin;
+  };
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const total = ents.reduce((s, e) => s + wOf(e), 0);
+    let roll = rng.next() * total;
+    let chosen = ents[0];
+    for (const e of ents) {
+      roll -= wOf(e);
+      if (roll <= 0) {
+        chosen = e;
+        break;
+      }
+    }
+    out.push(chosen.p.name);
+  }
+  return out;
+}
+
+function bestKicker(lineup: Lineup): string {
+  let name = "";
+  let best = -1;
+  for (const p of Object.values(lineup)) {
+    if (!p) continue;
+    const gk = getAttrs(p).goalKick;
+    if (gk > best) {
+      best = gk;
+      name = p.name;
+    }
+  }
+  return name;
+}
+
+function pickMotmH2H(
+  homeLineup: Lineup,
+  awayLineup: Lineup,
+  home: H2HTeam,
+  away: H2HTeam,
+  homeWon: boolean,
+  rng: Rng,
+): { name: string; team: string } {
+  const cands: { name: string; team: string; w: number }[] = [];
+  const add = (lineup: Lineup, label: string, win: boolean, scorers: string[]) => {
+    for (const p of Object.values(lineup)) {
+      if (!p) continue;
+      let w = Math.pow(p.ovr, 2.4);
+      if (win) w *= 1.7;
+      const scored = scorers.filter((nm) => nm === p.name).length;
+      w *= 1 + scored * 0.9;
+      cands.push({ name: p.name, team: label, w });
+    }
+  };
+  add(homeLineup, home.label, homeWon, home.tryScorers);
+  add(awayLineup, away.label, !homeWon, away.tryScorers);
+  const total = cands.reduce((s, c) => s + c.w, 0);
+  let roll = rng.next() * total;
+  for (const c of cands) {
+    roll -= c.w;
+    if (roll <= 0) return { name: c.name, team: c.team };
+  }
+  return { name: cands[0].name, team: cands[0].team };
+}
+
+export function simH2H(
+  homeLineup: Lineup,
+  awayLineup: Lineup,
+  labels: { home: string; away: string },
+  seed: string,
+): H2HResult {
+  const fh = computeFacets(homeLineup);
+  const fa = computeFacets(awayLineup);
+  const ph = powers(fh);
+  const pa = powers(fa);
+  const rng = new Rng(seed + ":h2h");
+
+  const hTries = h2hTryCount(ph.attack, pa.defence, rng);
+  const aTries = h2hTryCount(pa.attack, ph.defence, rng);
+
+  const hKick = h2hKick(fh.goalKick);
+  const aKick = h2hKick(fa.goalKick);
+  const hCons = Math.round(hTries * hKick);
+  const aCons = Math.round(aTries * aKick);
+
+  const pens = (gk: number, oppDisc: number) => {
+    const chances = Math.max(0, Math.round(rng.normal(2.5 - (oppDisc - 80) * 0.05, 1.0)));
+    return Math.round(chances * Math.max(0.5, h2hKick(gk)));
+  };
+  const hPens = pens(fh.goalKick, fa.discipline);
+  const aPens = pens(fa.goalKick, fh.discipline);
+
+  const hDrop = rng.next() < 0.12 ? 1 : 0;
+  const aDrop = rng.next() < 0.1 ? 1 : 0;
+
+  let hPts = hTries * 5 + hCons * 2 + hPens * 3 + hDrop * 3;
+  let aPts = aTries * 5 + aCons * 2 + aPens * 3 + aDrop * 3;
+
+  // A friendly head-to-head can't end level — settle with a golden-point kick,
+  // the stronger all-round side favoured.
+  let golden = false;
+  if (hPts === aPts) {
+    golden = true;
+    const edge = ph.attack + ph.defence - (pa.attack + pa.defence) + rng.normal(0, 8);
+    if (edge >= 0) hPts += 3;
+    else aPts += 3;
+  }
+  const homeWon = hPts > aPts;
+
+  const hScorers = pickScorers(homeLineup, hTries, rng);
+  const aScorers = pickScorers(awayLineup, aTries, rng);
+
+  const home: H2HTeam = {
+    label: labels.home,
+    overall: Math.round(fh.overall),
+    tries: hTries,
+    cons: hCons,
+    pens: hPens,
+    drops: hDrop,
+    points: hPts,
+    topUnit: topUnit(fh),
+    tryScorers: hScorers,
+  };
+  const away: H2HTeam = {
+    label: labels.away,
+    overall: Math.round(fa.overall),
+    tries: aTries,
+    cons: aCons,
+    pens: aPens,
+    drops: aDrop,
+    points: aPts,
+    topUnit: topUnit(fa),
+    tryScorers: aScorers,
+  };
+
+  // Build a minute-by-minute reel of the scoring moments.
+  const raw: Omit<H2HMoment, "minute">[] = [];
+  const hKicker = bestKicker(homeLineup);
+  const aKicker = bestKicker(awayLineup);
+  hScorers.forEach((nm) =>
+    raw.push({ side: "home", kind: "try", text: `${nm} touches down for ${labels.home}` }),
+  );
+  aScorers.forEach((nm) =>
+    raw.push({ side: "away", kind: "try", text: `${nm} touches down for ${labels.away}` }),
+  );
+  for (let i = 0; i < hPens; i++)
+    raw.push({ side: "home", kind: "pen", text: `${hKicker} slots a penalty` });
+  for (let i = 0; i < aPens; i++)
+    raw.push({ side: "away", kind: "pen", text: `${aKicker} slots a penalty` });
+  if (hDrop) raw.push({ side: "home", kind: "drop", text: `${hKicker} drops a goal` });
+  if (aDrop) raw.push({ side: "away", kind: "drop", text: `${aKicker} drops a goal` });
+
+  const minutes = rng
+    .shuffle(Array.from({ length: 79 }, (_, i) => i + 1))
+    .slice(0, raw.length)
+    .sort((a, b) => a - b);
+  const timeline: H2HMoment[] = raw
+    .map((m, i) => ({ ...m, minute: minutes[i] ?? 80 }))
+    .sort((a, b) => a.minute - b.minute);
+  if (golden)
+    timeline.push({
+      minute: 80,
+      side: homeWon ? "home" : "away",
+      kind: "drop",
+      text: `Golden point! ${homeWon ? labels.home : labels.away} land the match-winner`,
+    });
+
+  const motm = pickMotmH2H(homeLineup, awayLineup, home, away, homeWon, rng);
+
+  const margin = Math.abs(hPts - aPts);
+  const winner = homeWon ? labels.home : labels.away;
+  let headline: string;
+  if (golden) headline = `${winner} steal it at the death!`;
+  else if (margin <= 5) headline = `${winner} edge a nerve-shredding classic`;
+  else if (margin >= 28) headline = `${winner} run riot`;
+  else if (margin >= 15) headline = `${winner} pull clear for a statement win`;
+  else headline = `${winner} prove a class apart`;
+
+  return { home, away, homeWon, draw: false, motm, timeline, headline };
 }
 
 function deriveAdvice(

@@ -6,8 +6,8 @@ import {
   endRunContext,
   track,
 } from "./analytics";
-import type { Lineup, Player, SlotId, Squad, TournamentResult } from "./types";
-import { positionLabel, ROLE_ORDER } from "./data/slots";
+import type { H2HResult, Lineup, Player, SlotId, Squad, TournamentResult } from "./types";
+import { positionLabel, ROLE_ORDER, SLOTS } from "./data/slots";
 import { SQUADS, type RatingMode } from "./data/squads";
 import {
   applyMove,
@@ -20,15 +20,24 @@ import {
   squadHasPick,
 } from "./engine/draft";
 import { computeFacets, signatureTags } from "./engine/ratings";
-import { readIncomingChallenge, type Challenge } from "./challenge";
+import { Rng } from "./engine/rng";
+import {
+  readIncomingChallenge,
+  readIncomingMatch,
+  lineupFromMatch,
+  matchLink,
+  type Challenge,
+  type MatchChallenge,
+} from "./challenge";
 import { StrengthPanel } from "./components/StrengthPanel";
-import { simulate } from "./engine/sim";
+import { simulate, simH2H } from "./engine/sim";
 import { Pitch } from "./components/Pitch";
 import { Result } from "./components/Result";
+import { MatchReport } from "./components/MatchReport";
 import { SimPlayback } from "./components/SimPlayback";
 import { Footer } from "./components/Footer";
 
-type Phase = "home" | "draft" | "sim" | "result";
+type Phase = "home" | "draft" | "sim" | "result" | "match";
 
 const DIFFICULTY = {
   easy: { label: "Easy", respins: 5, hideRatings: false, blurb: "5 re-spins · ratings shown" },
@@ -54,6 +63,10 @@ const RATING = {
     blurb: "Every player at their career peak",
   },
 } as const satisfies Record<RatingMode, { label: string; blurb: string }>;
+
+// Canonical settings for the shared Daily Challenge, so every player faces the
+// identical draft regardless of their own toggle preferences.
+const DAILY = { diff: "medium", era: "all", rating: "seasonal" } as const;
 
 function todaySeed(): string {
   return "daily-" + new Date().toISOString().slice(0, 10);
@@ -82,6 +95,13 @@ export default function App() {
   const [result, setResult] = useState<TournamentResult | null>(null);
   const [incomingChallenge, setIncomingChallenge] = useState<Challenge | null>(null);
   const [activeChallenge, setActiveChallenge] = useState<Challenge | null>(null);
+  // Head-to-head: an opponent XV we're playing against, the match result, and a
+  // nonce so "Rematch" produces a fresh 80 minutes.
+  const [incomingMatch, setIncomingMatch] = useState<MatchChallenge | null>(null);
+  const [opponentLineup, setOpponentLineup] = useState<Lineup | null>(null);
+  const [matchResult, setMatchResult] = useState<H2HResult | null>(null);
+  const [matchNonce, setMatchNonce] = useState(0);
+  const [matchLinkCopied, setMatchLinkCopied] = useState(false);
   const animRef = useRef<number | null>(null);
   const lastSquadIdRef = useRef<string | null>(null);
 
@@ -92,6 +112,20 @@ export default function App() {
 
   useEffect(() => {
     initAnalytics();
+    const m = readIncomingMatch();
+    if (m) {
+      const opp = lineupFromMatch(m);
+      if (opp) {
+        setIncomingMatch(m);
+        setOpponentLineup(opp);
+        // Match the challenger's draft settings so both build comparable XVs.
+        if (m.diff in DIFFICULTY) setDifficulty(m.diff as Diff);
+        if (m.era in ERA) setEra(m.era as Era);
+        if (m.rating in RATING) setRatingMode(m.rating as RatingMode);
+        track("match_opened", { opponent_overall: m.overall });
+        return;
+      }
+    }
     const c = readIncomingChallenge();
     if (c) {
       setIncomingChallenge(c);
@@ -106,13 +140,22 @@ export default function App() {
   const startRun = useCallback(
     (opts?: { daily?: boolean; accept?: Challenge | null }) => {
       const accept = opts?.accept ?? null;
-      // Accepting a challenge replays its exact seed AND settings for fairness.
-      const useDiff = (accept && accept.diff in DIFFICULTY ? accept.diff : difficulty) as Diff;
-      const useEra = (accept && accept.era in ERA ? accept.era : era) as Era;
-      const useRating = (accept && accept.rating in RATING ? accept.rating : ratingMode) as RatingMode;
+      const isDaily = !!opts?.daily;
+      // Shared challenges must be airtight: everyone faces the SAME draft. A
+      // friend-challenge replays the challenger's exact settings; the Daily uses
+      // a fixed canonical set so toggles can't make two players' drafts differ.
+      const useDiff = (
+        accept && accept.diff in DIFFICULTY ? accept.diff : isDaily ? DAILY.diff : difficulty
+      ) as Diff;
+      const useEra = (
+        accept && accept.era in ERA ? accept.era : isDaily ? DAILY.era : era
+      ) as Era;
+      const useRating = (
+        accept && accept.rating in RATING ? accept.rating : isDaily ? DAILY.rating : ratingMode
+      ) as RatingMode;
       const cfg = DIFFICULTY[useDiff];
-      const s = accept ? accept.seed : opts?.daily ? todaySeed() : randomSeed();
-      if (accept) {
+      const s = accept ? accept.seed : isDaily ? todaySeed() : randomSeed();
+      if (accept || isDaily) {
         setDifficulty(useDiff);
         setEra(useEra);
         setRatingMode(useRating);
@@ -178,14 +221,18 @@ export default function App() {
       const pool = Array.from(new Map(spins.map((s) => [s.id, s])).values());
       const pickable = pool.filter((sq) => squadHasPick(sq, curLineup, curPicked));
       const preferred = pickable.filter((sq) => sq.id !== avoid);
-      const choices = preferred.length > 0 ? preferred : pickable;
+      const choices = (preferred.length > 0 ? preferred : pickable).sort((a, b) =>
+        a.id.localeCompare(b.id),
+      );
       if (choices.length > 0) {
-        landOn(choices[Math.floor(Math.random() * choices.length)], null, true);
+        // Deterministic pick (seed + round) so the fallback is reproducible too.
+        const r = new Rng(seed + ":fb:" + round);
+        landOn(choices[r.int(0, choices.length - 1)], null, true);
         return;
       }
       setCurrentSquad(null);
     },
-    [spins],
+    [spins, seed],
   );
 
   const doSpin = useCallback(() => {
@@ -313,6 +360,79 @@ export default function App() {
     setPhase("sim");
   }, [lineup, seed]);
 
+  // A match's outcome is seeded from both XVs (plus a nonce for rematches), so
+  // it's deterministic for a given matchup but can be re-rolled.
+  const matchSeed = useCallback(
+    (home: Lineup, away: Lineup, nonce: number) =>
+      "m:" +
+      SLOTS.map((s) => home[s.id]?.id ?? "").join(",") +
+      "|" +
+      SLOTS.map((s) => away[s.id]?.id ?? "").join(",") +
+      ":" +
+      nonce,
+    [],
+  );
+
+  const kickOffMatch = useCallback(
+    (nonce = 0) => {
+      if (!opponentLineup) return;
+      const oppName = incomingMatch?.name || "Challenger";
+      const r = simH2H(
+        lineup,
+        opponentLineup,
+        { home: "Your XV", away: oppName },
+        matchSeed(lineup, opponentLineup, nonce),
+      );
+      track("match_played", {
+        home_won: r.homeWon,
+        home_points: r.home.points,
+        away_points: r.away.points,
+        overall: Math.round(proj.overall),
+        opponent_overall: incomingMatch?.overall ?? 0,
+        rematch: nonce > 0,
+      });
+      setMatchResult(r);
+      setMatchNonce(nonce);
+      setPhase("match");
+    },
+    [opponentLineup, incomingMatch, lineup, proj.overall, matchSeed],
+  );
+
+  const buildMatchChallenge = useCallback(
+    (): MatchChallenge => ({
+      ids: SLOTS.map((s) => lineup[s.id]?.id ?? ""),
+      rating: ratingMode,
+      era,
+      diff: difficulty,
+      name: "A friend",
+      overall: proj.overall,
+    }),
+    [lineup, ratingMode, era, difficulty, proj.overall],
+  );
+
+  const shareMatchChallenge = useCallback(async () => {
+    const url = matchLink(buildMatchChallenge());
+    const line = `I drafted an XV on XV 🏉 — draft your own and let's settle it over 80 minutes.`;
+    const canNativeShare =
+      typeof navigator !== "undefined" && typeof navigator.share === "function";
+    track("match_challenge_created", { overall: Math.round(proj.overall) });
+    try {
+      if (canNativeShare) {
+        await navigator.share({ title: "XV — face my XV", text: line, url });
+        return;
+      }
+    } catch {
+      // dismissed — fall through to copy
+    }
+    try {
+      await navigator.clipboard?.writeText(`${line}\n${url}`);
+      setMatchLinkCopied(true);
+      setTimeout(() => setMatchLinkCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }, [buildMatchChallenge, proj.overall]);
+
   // ---------- RENDER ----------
   if (phase === "home") {
     return (
@@ -341,7 +461,22 @@ export default function App() {
               <span>matches to glory</span>
             </div>
           </div>
-          {incomingChallenge && (
+          {incomingMatch && opponentLineup && (
+            <div className="challenge-banner match">
+              <div className="cb-title">⚔️ Head-to-head challenge!</div>
+              <div className="cb-detail">
+                {incomingMatch.name} drafted an XV rated{" "}
+                <b>{incomingMatch.overall}</b> and wants to play you.
+              </div>
+              <button className="btn primary big" onClick={() => startRun()}>
+                Draft your XV to face them
+              </button>
+              <div className="cb-note muted">
+                Build your best 15, then kick off an 80-minute match.
+              </div>
+            </div>
+          )}
+          {!incomingMatch && incomingChallenge && (
             <div className="challenge-banner">
               <div className="cb-title">🏉 You've been challenged!</div>
               <div className="cb-detail">
@@ -417,8 +552,8 @@ export default function App() {
             </button>
           </div>
           <p className="muted home-daily-note">
-            Daily Challenge = the same draft for everyone today. Compare scores
-            with friends.
+            Daily Challenge = the same draft for everyone today (fixed settings:
+            all-time · seasonal · medium). Compare scores with friends.
           </p>
           <div className="home-how">
             <p>
@@ -449,6 +584,23 @@ export default function App() {
         settings={{ era, rating: ratingMode, diff: difficulty }}
         challenge={activeChallenge}
         onPlayAgain={() => startRun({ daily: seed.startsWith("daily") })}
+      />
+    );
+  }
+
+  if (phase === "match" && matchResult) {
+    return (
+      <MatchReport
+        result={matchResult}
+        homeLineup={lineup}
+        challengeBackUrl={matchLink(buildMatchChallenge())}
+        onRematch={() => kickOffMatch(matchNonce + 1)}
+        onNewRun={() => {
+          setIncomingMatch(null);
+          setOpponentLineup(null);
+          setMatchResult(null);
+          setPhase("home");
+        }}
       />
     );
   }
@@ -516,13 +668,32 @@ export default function App() {
 
         <aside className="draft-panel">
           {isComplete ? (
-            <div className="complete">
-              <h2>Your XV is set.</h2>
-              <p className="muted">15 legends, one shot at immortality.</p>
-              <button className="btn primary big" onClick={kickOff}>
-                Kick Off the World Cup →
-              </button>
-            </div>
+            opponentLineup ? (
+              <div className="complete">
+                <h2>Your XV is set.</h2>
+                <p className="muted">
+                  Time to face {incomingMatch?.name ?? "your challenger"}'s XV
+                  {incomingMatch ? ` (rated ${incomingMatch.overall})` : ""}.
+                </p>
+                <button className="btn primary big" onClick={() => kickOffMatch(0)}>
+                  Play the Match ⚔️
+                </button>
+                <button className="btn ghost" onClick={kickOff}>
+                  Play a solo World Cup instead
+                </button>
+              </div>
+            ) : (
+              <div className="complete">
+                <h2>Your XV is set.</h2>
+                <p className="muted">15 legends, one shot at immortality.</p>
+                <button className="btn primary big" onClick={kickOff}>
+                  Kick Off the World Cup →
+                </button>
+                <button className="btn ghost" onClick={shareMatchChallenge}>
+                  {matchLinkCopied ? "Link copied!" : "⚔️ Challenge a friend to a match"}
+                </button>
+              </div>
+            )
           ) : !currentSquad ? (
             <div className="spin-area">
               <div className={`wheel ${spinning ? "spinning" : ""}`}>
