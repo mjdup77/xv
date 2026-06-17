@@ -67,7 +67,7 @@ export const WC_2011_2015: Squad[] = [
     { n: "Sekope Kepu", r: "prop", o: 84, s: { setPiece: 88 } },
     { n: "Rob Simmons", r: "lock", o: 82 },
     { n: "Kane Douglas", r: "lock", o: 81 },
-    { n: "David Pocock", r: "flanker", o: 91, s: { breakdown: 93, defence: 90 } },
+    { n: "David Pocock", r: "flanker", o: 91, alt: ["number8"], s: { breakdown: 93, defence: 90 } },
     { n: "Michael Hooper", r: "flanker", o: 88, s: { breakdown: 90 } },
     { n: "Scott Fardy", r: "flanker", o: 84, alt: ["lock"] },
     { n: "Will Genia", r: "scrumhalf", o: 86 },
