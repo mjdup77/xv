@@ -94,6 +94,7 @@ function aggregate(events: Ev[]) {
   const sessions = new Set<string>();
   const byDayUsers: Record<string, Set<string>> = {};
   const byDayRuns: Record<string, number> = {};
+  const userFirstSeen: Record<string, string> = {};
   const difficulty: Record<string, number> = {};
   const era: Record<string, number> = {};
   const ratingMode: Record<string, number> = {};
@@ -127,6 +128,8 @@ function aggregate(events: Ev[]) {
     if (e.session_id) sessions.add(e.session_id);
     const d = dayOf(e);
     (byDayUsers[d] ||= new Set()).add(e.user_id || e.session_id || "?");
+    if (e.user_id && (!userFirstSeen[e.user_id] || d < userFirstSeen[e.user_id]))
+      userFirstSeen[e.user_id] = d;
 
     switch (e.event) {
       case "run_started":
@@ -194,9 +197,25 @@ function aggregate(events: Ev[]) {
     if (e.country) inc(countries, e.country);
   }
 
+  const newByDay: Record<string, number> = {};
+  for (const uid in userFirstSeen) inc(newByDay, userFirstSeen[uid]);
+
   const dailyActive = Object.entries(byDayUsers)
-    .map(([day, set]) => ({ day, users: set.size, runs: byDayRuns[day] || 0 }))
+    .map(([day, set]) => ({
+      day,
+      users: set.size,
+      runs: byDayRuns[day] || 0,
+      newUsers: newByDay[day] || 0,
+    }))
     .sort((a, b) => a.day.localeCompare(b.day));
+  // Running totals for the "over time" growth view.
+  let cumU = 0;
+  let cumR = 0;
+  const cumulative = dailyActive.map((d) => {
+    cumU += d.newUsers;
+    cumR += d.runs;
+    return { day: d.day, players: cumU, runs: cumR };
+  });
 
   recentRuns.sort((a, b) => b.ts.localeCompare(a.ts));
 
@@ -229,6 +248,7 @@ function aggregate(events: Ev[]) {
       { step: "Run completed", count: runsCompleted },
     ],
     dailyActive,
+    cumulative,
     breakdowns: { difficulty, era, ratingMode },
     abandonByRound,
     sources,

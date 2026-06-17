@@ -87,6 +87,17 @@
 
         <div class="grid2" style="margin-top:16px">
           <div>
+            <h2>Total players over time</h2>
+            <div class="panel"><div class="chart" id="cumUsers"></div></div>
+          </div>
+          <div>
+            <h2>Total runs over time</h2>
+            <div class="panel"><div class="chart" id="cumRuns"></div></div>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top:16px">
+          <div>
             <h2>Acquisition → retention funnel</h2>
             <div class="panel funnel" id="funnel"></div>
           </div>
@@ -228,6 +239,26 @@
           col.appendChild(el("div", "colx", day.day.slice(5)));
           chart.appendChild(col);
         }
+
+        // Cumulative growth charts (everything over time).
+        function cumChart(id, key, label) {
+          const box = document.getElementById(id);
+          box.innerHTML = "";
+          const cum = (d.cumulative || []).slice(-30);
+          if (!cum.length) { box.appendChild(el("div", "muted", "No activity yet.")); return; }
+          const max = Math.max(1, ...cum.map((x) => x[key]));
+          for (const pt of cum) {
+            const col = el("div", "col");
+            const bar = el("div", "colbar");
+            bar.style.height = (pt[key] / max) * 120 + "px";
+            bar.title = pt.day + ": " + pt[key] + " " + label;
+            col.appendChild(bar);
+            col.appendChild(el("div", "colx", pt.day.slice(5)));
+            box.appendChild(col);
+          }
+        }
+        cumChart("cumUsers", "players", "total players");
+        cumChart("cumRuns", "runs", "total runs");
 
         bars(
           document.getElementById("funnel"),
