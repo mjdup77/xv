@@ -290,10 +290,10 @@
           tbl.innerHTML = "<tr><td class='muted'>No completed runs yet.</td></tr>";
       }
 
-      // Auto-refresh every 60s while open.
+      // Auto-refresh every 5 min while open (manual Refresh always available).
       setInterval(() => {
         if (localStorage.getItem(KEY_LS)) load();
-      }, 60000);
+      }, 300000);
 
       // Allow one-click auth via URL: dashboard.html#key=YOURKEY (or ?key=).
       (function () {

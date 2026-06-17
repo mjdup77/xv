@@ -5,6 +5,7 @@
 // STATS_KEY env var. Results are cached in-memory briefly to limit blob reads.
 
 import { list, get } from "@vercel/blob";
+import { sql } from "@vercel/postgres";
 
 interface Ev {
   event: string;
@@ -21,7 +22,7 @@ interface Ev {
 }
 
 const cache = new Map<string, { at: number; data: unknown }>();
-const TTL_MS = 30_000;
+const TTL_MS = 60_000;
 
 function dayOf(e: Ev): string {
   return (e.received_at || e.ts || "").slice(0, 10) || "unknown";
@@ -57,6 +58,33 @@ async function readAllEvents(token: string): Promise<Ev[]> {
     cursor = page.hasMore ? page.cursor : undefined;
   } while (cursor && guard++ < 50);
   return out;
+}
+
+// Read events from Postgres (preferred sink). One indexed query instead of
+// fetching every Blob object, so dashboard reads are cheap and scalable.
+async function readAllEventsPg(): Promise<Ev[]> {
+  const { rows } = await sql`
+    select event, client_ts, received_at, user_id, session_id, run_id,
+           difficulty, era, rating_mode, country, props
+    from events
+    order by received_at desc
+    limit 500000
+  `;
+  return rows.map((r) => ({
+    event: r.event as string,
+    ts: r.client_ts ? new Date(r.client_ts as string).toISOString() : undefined,
+    received_at: r.received_at
+      ? new Date(r.received_at as string).toISOString()
+      : undefined,
+    user_id: (r.user_id as string) ?? undefined,
+    session_id: (r.session_id as string) ?? undefined,
+    run_id: (r.run_id as string) ?? undefined,
+    difficulty: (r.difficulty as string) ?? undefined,
+    era: (r.era as string) ?? undefined,
+    rating_mode: (r.rating_mode as string) ?? undefined,
+    country: (r.country as string) ?? undefined,
+    props: (r.props as Record<string, unknown>) ?? {},
+  }));
 }
 
 function aggregate(events: Ev[]) {
@@ -232,8 +260,10 @@ export default async function handler(
     res.status(401).json({ error: "unauthorized" });
     return;
   }
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    res.status(503).json({ error: "no_blob_store" });
+  const hasPg = Boolean(process.env.POSTGRES_URL);
+  const hasBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  if (!hasPg && !hasBlob) {
+    res.status(503).json({ error: "no_store" });
     return;
   }
 
@@ -247,7 +277,7 @@ export default async function handler(
       .map((s) => s.trim())
       .filter(Boolean),
   );
-  const cacheKey = [...excluded].sort().join("|") || "all";
+  const cacheKey = (hasPg ? "pg:" : "blob:") + ([...excluded].sort().join("|") || "all");
 
   const hit = cache.get(cacheKey);
   if (hit && Date.now() - hit.at < TTL_MS) {
@@ -255,11 +285,14 @@ export default async function handler(
     return;
   }
   try {
-    let events = await readAllEvents(process.env.BLOB_READ_WRITE_TOKEN);
+    let events = hasPg
+      ? await readAllEventsPg()
+      : await readAllEvents(process.env.BLOB_READ_WRITE_TOKEN as string);
     if (excluded.size)
       events = events.filter((e) => !e.user_id || !excluded.has(e.user_id));
     const data = aggregate(events) as Record<string, unknown>;
     data.excludedUsers = excluded.size;
+    data.source = hasPg ? "postgres" : "blob";
     cache.set(cacheKey, { at: Date.now(), data });
     res.status(200).json(data);
   } catch (err) {

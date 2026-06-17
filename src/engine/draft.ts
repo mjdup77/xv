@@ -74,15 +74,33 @@ export function buildSpinSequence(
   const filtered = SQUADS.filter((s) => s.year >= minYear);
   const base = filtered.length > 0 ? filtered : SQUADS;
   const pool = base.map((s) => applyRatingMode(s, ratingMode));
+
+  // "Bag" randomiser (like Tetris): deal out a full shuffle of the pool before
+  // any squad can recur, so you never roll the same squad twice in a pass. Big
+  // nations (NZ/Aus/France have ~10 squads each) would still bunch up in a raw
+  // shuffle, so we space same-nation entries apart.
+  const decluster = (a: Squad[]): Squad[] => {
+    for (let i = 1; i < a.length; i++) {
+      if (a[i].nation !== a[i - 1].nation) continue;
+      for (let k = i + 1; k < a.length; k++) {
+        if (a[k].nation !== a[i - 1].nation) {
+          [a[i], a[k]] = [a[k], a[i]];
+          break;
+        }
+      }
+    }
+    return a;
+  };
+
   const out: Squad[] = [];
-  let last = "";
-  for (let i = 0; i < length; i++) {
-    let s = rng.pick(pool);
-    // Avoid immediate repeats for variety.
-    let guard = 0;
-    while (s.id === last && guard++ < 5) s = rng.pick(pool);
-    last = s.id;
-    out.push(s);
+  let guard = 0;
+  while (out.length < length && guard++ < 50) {
+    const bag = decluster(rng.shuffle(pool));
+    // Guard the seam between consecutive bags against a same-nation repeat.
+    if (out.length > 0 && bag.length > 1 && bag[0].nation === out[out.length - 1].nation) {
+      bag.push(bag.shift()!);
+    }
+    out.push(...bag);
   }
-  return out;
+  return out.slice(0, length);
 }
