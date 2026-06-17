@@ -68,7 +68,7 @@ export const SLOTS: Slot[] = [
   { id: "OC", number: 13, label: "Outside Centre", accepts: ["centre"], x: 60, y: 66 },
   { id: "LW", number: 11, label: "Left Wing", accepts: ["wing", "fullback"], x: 15, y: 73 },
   { id: "RW", number: 14, label: "Right Wing", accepts: ["wing", "fullback"], x: 85, y: 73 },
-  { id: "FB", number: 15, label: "Fullback", accepts: ["fullback", "wing"], x: 50, y: 87 },
+  { id: "FB", number: 15, label: "Fullback", accepts: ["fullback"], x: 50, y: 87 },
 ];
 
 export const SLOT_BY_ID: Record<SlotId, Slot> = Object.fromEntries(
