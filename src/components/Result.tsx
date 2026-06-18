@@ -10,6 +10,8 @@ interface Props {
   seed: string;
   settings: { era: string; rating: string; diff: string };
   challenge?: Challenge | null;
+  matchUrl: string;
+  streakNote?: string;
   onPlayAgain: () => void;
 }
 
@@ -26,7 +28,16 @@ function FacetBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function Result({ result, lineup, seed, settings, challenge, onPlayAgain }: Props) {
+export function Result({
+  result,
+  lineup,
+  seed,
+  settings,
+  challenge,
+  matchUrl,
+  streakNote,
+  onPlayAgain,
+}: Props) {
   const klass = result.perfect35
     ? "perfect"
     : result.champion
@@ -42,9 +53,34 @@ export function Result({ result, lineup, seed, settings, challenge, onPlayAgain 
       : "Where it slipped";
 
   const [shared, setShared] = useState(false);
+  const [sharedMatch, setSharedMatch] = useState(false);
 
   // Beat-my-score comparison when this run was an accepted challenge.
   const beat = challenge ? result.perfectScore - challenge.score : null;
+
+  const shareMatch = async () => {
+    const line = result.champion
+      ? `I won the Rugby World Cup on XV 🏉 — now draft your own XV and face mine over 80 minutes.`
+      : `I drafted an XV on XV 🏉 — draft yours and let's settle it over 80 minutes.`;
+    const canNativeShare =
+      typeof navigator !== "undefined" && typeof navigator.share === "function";
+    track("match_share_clicked", { method: canNativeShare ? "native" : "copy", from: "result" });
+    try {
+      if (canNativeShare) {
+        await navigator.share({ title: "XV — face my XV", text: line, url: matchUrl });
+        return;
+      }
+    } catch {
+      /* dismissed — fall through to copy */
+    }
+    try {
+      await navigator.clipboard?.writeText(`${line}\n${matchUrl}`);
+      setSharedMatch(true);
+      setTimeout(() => setSharedMatch(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
 
   const share = async () => {
     const headline = result.perfect35
@@ -219,18 +255,37 @@ export function Result({ result, lineup, seed, settings, challenge, onPlayAgain 
         <Pitch lineup={lineup} />
       </div>
 
+      <div className="share-prompt">
+        <div className="share-prompt-title">
+          {result.champion
+            ? "🏉 You're a World Champion — now make a mate try to beat it."
+            : "🏉 Think a friend can do better? Send it to them."}
+        </div>
+        <div className="share-prompt-actions">
+          <button className="btn primary" onClick={share}>
+            {shared ? "Link copied!" : "Beat my score"}
+          </button>
+          <button className="btn primary" onClick={shareMatch}>
+            {sharedMatch ? "Link copied!" : "⚔️ Play my XV (head-to-head)"}
+          </button>
+        </div>
+        <div className="share-prompt-sub muted">
+          “Beat my score” = same draft, your shot at a higher total. “Play my XV”
+          = they draft their own team and the two sides play a match.
+        </div>
+      </div>
+
+      {streakNote && <div className="streak-note">{streakNote}</div>}
+
       <div className="result-actions">
         <button
-          className="btn primary"
+          className="btn ghost"
           onClick={() => {
             track("play_again_clicked", { from: "result" });
             onPlayAgain();
           }}
         >
           New Run
-        </button>
-        <button className="btn ghost" onClick={share}>
-          {shared ? "Link copied!" : "Challenge a friend"}
         </button>
       </div>
     </div>

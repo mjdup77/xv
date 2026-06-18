@@ -445,6 +445,31 @@ button { font-family: inherit; cursor: pointer; }
 }
 .mr-timeline li.tl-try .tl-text { font-weight: 700; }
 
+/* ---------- Streak ---------- */
+.streak-badge {
+  display: inline-flex; align-items: center; gap: 8px; align-self: center;
+  margin: 4px auto 0; padding: 8px 16px; border-radius: 999px;
+  background: linear-gradient(160deg, rgba(245,196,81,0.18), rgba(245,196,81,0.06));
+  border: 1px solid rgba(245,196,81,0.5);
+}
+.streak-flame { font-size: 16px; }
+.streak-count { font-weight: 800; color: var(--gold); font-size: 15px; }
+.streak-sub { font-size: 12px; color: var(--muted); }
+.streak-note {
+  text-align: center; color: var(--gold); font-weight: 700; font-size: 14px;
+  margin: 4px 0 16px;
+}
+
+/* ---------- Share prompt (results) ---------- */
+.share-prompt {
+  margin: 26px 0 8px; padding: 20px; text-align: center;
+  border: 1px solid rgba(47,208,126,0.45); border-radius: 16px;
+  background: linear-gradient(160deg, rgba(47,208,126,0.12), rgba(47,208,126,0.03));
+}
+.share-prompt-title { font-weight: 800; font-size: 17px; margin-bottom: 14px; }
+.share-prompt-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.share-prompt-sub { font-size: 12.5px; margin-top: 12px; line-height: 1.5; }
+
 /* ---------- Mobile ---------- */
 @media (max-width: 880px) {
   .draft-head { flex-wrap: wrap; gap: 10px 16px; padding: 12px 14px; }
@@ -460,4 +485,6 @@ button { font-family: inherit; cursor: pointer; }
   .mr-team-pts { font-size: 40px; }
   .mr-team-name { font-size: 14px; }
   .mr-headline { font-size: 17px; }
+  .share-prompt-actions { flex-direction: column; }
+  .share-prompt-actions .btn { width: 100%; }
 }

@@ -39,10 +39,13 @@
       .bar-fill { height: 100%; background: var(--gold); border-radius: 6px; }
       .bar-row .val { width: 54px; text-align: right; }
       .funnel .bar-fill { background: var(--blue); }
-      .chart { display: flex; align-items: flex-end; gap: 4px; height: 140px; padding-top: 8px; }
-      .chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
-      .chart .colbar { width: 100%; background: var(--green); border-radius: 4px 4px 0 0; min-height: 2px; }
-      .chart .colx { font-size: 9px; color: var(--muted); white-space: nowrap; transform: rotate(-45deg); transform-origin: top left; }
+      .chart { display: flex; align-items: flex-end; justify-content: center; gap: 18px; height: 184px; padding: 8px 4px 0; }
+      .chart .col { flex: 0 1 72px; max-width: 100px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; height: 100%; }
+      .chart .colval { font-size: 12px; font-weight: 700; color: var(--text); }
+      .chart .colbar { width: 100%; background: var(--green); border-radius: 5px 5px 0 0; min-height: 3px; }
+      .chart .colbar.zero { background: var(--line); }
+      .chart .colx { font-size: 11px; color: var(--muted); white-space: nowrap; text-align: center; }
+      .chart-empty { color: var(--muted); font-size: 13px; }
       table { width: 100%; border-collapse: collapse; font-size: 13px; }
       th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
       th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
@@ -224,41 +227,53 @@
           cc.appendChild(c);
         }
 
-        // Daily chart (last 30 days)
-        const days = d.dailyActive.slice(-30);
-        const chart = document.getElementById("chart");
-        chart.innerHTML = "";
-        const maxU = Math.max(1, ...days.map((x) => x.users));
-        if (!days.length) chart.appendChild(el("div", "muted", "No activity yet."));
-        for (const day of days) {
-          const col = el("div", "col");
-          const bar = el("div", "colbar");
-          bar.style.height = (day.users / maxU) * 120 + "px";
-          bar.title = day.day + ": " + day.users + " users, " + day.runs + " runs";
-          col.appendChild(bar);
-          col.appendChild(el("div", "colx", day.day.slice(5)));
-          chart.appendChild(col);
-        }
-
-        // Cumulative growth charts (everything over time).
-        function cumChart(id, key, label) {
-          const box = document.getElementById(id);
-          box.innerHTML = "";
-          const cum = (d.cumulative || []).slice(-30);
-          if (!cum.length) { box.appendChild(el("div", "muted", "No activity yet.")); return; }
-          const max = Math.max(1, ...cum.map((x) => x[key]));
-          for (const pt of cum) {
+        // Reusable column chart: value label on top, day label beneath, bars
+        // scaled to the series max so a single day reads clearly (not a block).
+        function colChart(container, points, getVal, getLabel, fmtTitle) {
+          container.innerHTML = "";
+          if (!points.length) {
+            container.appendChild(el("div", "chart-empty", "No activity yet."));
+            return;
+          }
+          const max = Math.max(1, ...points.map(getVal));
+          for (const p of points) {
+            const v = getVal(p);
             const col = el("div", "col");
-            const bar = el("div", "colbar");
-            bar.style.height = (pt[key] / max) * 120 + "px";
-            bar.title = pt.day + ": " + pt[key] + " " + label;
+            col.appendChild(el("div", "colval", String(v)));
+            const bar = el("div", "colbar" + (v === 0 ? " zero" : ""));
+            // 120px is the usable bar height inside the 184px chart box.
+            bar.style.height = (v === 0 ? 3 : Math.max(6, (v / max) * 120)) + "px";
+            bar.title = fmtTitle(p);
             col.appendChild(bar);
-            col.appendChild(el("div", "colx", pt.day.slice(5)));
-            box.appendChild(col);
+            col.appendChild(el("div", "colx", getLabel(p)));
+            container.appendChild(col);
           }
         }
-        cumChart("cumUsers", "players", "total players");
-        cumChart("cumRuns", "runs", "total runs");
+
+        const days = d.dailyActive.slice(-30);
+        colChart(
+          document.getElementById("chart"),
+          days,
+          (x) => x.users,
+          (x) => x.day.slice(5),
+          (x) => x.day + ": " + x.users + " users, " + x.runs + " runs",
+        );
+
+        const cum = (d.cumulative || []).slice(-30);
+        colChart(
+          document.getElementById("cumUsers"),
+          cum,
+          (x) => x.players,
+          (x) => x.day.slice(5),
+          (x) => x.day + ": " + x.players + " total players",
+        );
+        colChart(
+          document.getElementById("cumRuns"),
+          cum,
+          (x) => x.runs,
+          (x) => x.day.slice(5),
+          (x) => x.day + ": " + x.runs + " total runs",
+        );
 
         bars(
           document.getElementById("funnel"),

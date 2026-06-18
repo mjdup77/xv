@@ -29,6 +29,7 @@ import {
   type Challenge,
   type MatchChallenge,
 } from "./challenge";
+import { recordPlay, streakStatus } from "./streak";
 import { StrengthPanel } from "./components/StrengthPanel";
 import { simulate, simH2H } from "./engine/sim";
 import { Pitch } from "./components/Pitch";
@@ -90,7 +91,7 @@ export default function App() {
   const [respinsLeft, setRespinsLeft] = useState(3);
   const [difficulty, setDifficulty] = useState<Diff>("medium");
   const [era, setEra] = useState<Era>("all");
-  const [ratingMode, setRatingMode] = useState<RatingMode>("seasonal");
+  const [ratingMode, setRatingMode] = useState<RatingMode>("prime");
   const [hideRatings, setHideRatings] = useState(false);
   const [result, setResult] = useState<TournamentResult | null>(null);
   const [incomingChallenge, setIncomingChallenge] = useState<Challenge | null>(null);
@@ -102,6 +103,7 @@ export default function App() {
   const [matchResult, setMatchResult] = useState<H2HResult | null>(null);
   const [matchNonce, setMatchNonce] = useState(0);
   const [matchLinkCopied, setMatchLinkCopied] = useState(false);
+  const [streak, setStreak] = useState(() => streakStatus());
   const animRef = useRef<number | null>(null);
   const lastSquadIdRef = useRef<string | null>(null);
 
@@ -345,6 +347,8 @@ export default function App() {
   const kickOff = useCallback(() => {
     track("kickoff_clicked", {});
     const r = simulate(lineup, seed);
+    const st = streakStatus(recordPlay());
+    setStreak(st);
     track("run_completed", {
       champion: r.champion,
       perfect35: r.perfect35,
@@ -355,6 +359,7 @@ export default function App() {
       tries_against: r.triesAgainst,
       verdict: r.verdict,
       identity: r.identity,
+      streak_day: st.current,
     });
     setResult(r);
     setPhase("sim");
@@ -383,6 +388,7 @@ export default function App() {
         { home: "Your XV", away: oppName },
         matchSeed(lineup, opponentLineup, nonce),
       );
+      if (nonce === 0) setStreak(streakStatus(recordPlay()));
       track("match_played", {
         home_won: r.homeWon,
         home_points: r.home.points,
@@ -461,6 +467,15 @@ export default function App() {
               <span>matches to glory</span>
             </div>
           </div>
+          {(streak.status === "kept" || streak.status === "alive") && (
+            <div className={`streak-badge ${streak.status}`}>
+              <span className="streak-flame">🔥</span>
+              <span className="streak-count">{streak.current}-day streak</span>
+              {streak.status === "alive" && (
+                <span className="streak-sub">play today to keep it alive</span>
+              )}
+            </div>
+          )}
           {incomingMatch && opponentLineup && (
             <div className="challenge-banner match">
               <div className="cb-title">⚔️ Head-to-head challenge!</div>
@@ -583,6 +598,12 @@ export default function App() {
         seed={seed}
         settings={{ era, rating: ratingMode, diff: difficulty }}
         challenge={activeChallenge}
+        matchUrl={matchLink(buildMatchChallenge())}
+        streakNote={
+          streak.status === "kept" && streak.current > 0
+            ? `🔥 ${streak.current}-day streak — come back tomorrow to make it ${streak.current + 1}.`
+            : undefined
+        }
         onPlayAgain={() => startRun({ daily: seed.startsWith("daily") })}
       />
     );
