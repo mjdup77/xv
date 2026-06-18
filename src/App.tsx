@@ -19,7 +19,7 @@ import {
   playerKey,
   squadHasPick,
 } from "./engine/draft";
-import { computeFacets, signatureTags } from "./engine/ratings";
+import { computeFacets } from "./engine/ratings";
 import { Rng } from "./engine/rng";
 import {
   readIncomingChallenge,
@@ -742,15 +742,6 @@ export default function App() {
                         {!hideRatings && <span className="pr-ovr">{p.ovr}</span>}
                         <span className="pr-mid">
                           <span className="pr-name">{p.name}</span>
-                          {!hideRatings && signatureTags(p).length > 0 && (
-                            <span className="pr-tags">
-                              {signatureTags(p).map((t) => (
-                                <span className="pr-tag" key={t.label} title={t.label}>
-                                  {t.icon} {t.label}
-                                </span>
-                              ))}
-                            </span>
-                          )}
                         </span>
                         <span className="pr-pos">
                           {pickedKeys.has(playerKey(p)) ? "picked" : positionLabel(p)}
