@@ -257,9 +257,11 @@ export function Result({
 
       <div className="share-prompt">
         <div className="share-prompt-title">
-          {result.champion
-            ? "🏉 You're a World Champion — now make a mate try to beat it."
-            : "🏉 Think a friend can do better? Send it to them."}
+          {result.perfect35
+            ? "🏉 The Perfect 35 — surely unbeatable. Dare a mate to try."
+            : result.champion
+              ? `🏉 World Cup won with ${result.perfectScore}/35 — challenge a mate to top it.`
+              : `🏉 You scored ${result.perfectScore}/35 — challenge a mate to beat it.`}
         </div>
         <div className="share-prompt-actions">
           <button className="btn primary" onClick={share}>
