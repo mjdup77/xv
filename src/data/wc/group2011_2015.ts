@@ -14,7 +14,7 @@ export const WC_2011_2015: Squad[] = [
     { n: "Piri Weepu", r: "scrumhalf", o: 84, s: { goalKick: 89 } },
     { n: "Aaron Cruden", r: "flyhalf", o: 83 },
     { n: "Ma'a Nonu", r: "centre", o: 88, s: { carry: 89 } },
-    { n: "Conrad Smith", r: "centre", o: 88, s: { defence: 89 } },
+    { n: "Conrad Smith", r: "centre", o: 89, s: { defence: 89 } },
     { n: "Sonny Bill Williams", r: "centre", o: 87, s: { handling: 90 } },
     { n: "Cory Jane", r: "wing", o: 84 },
     { n: "Richard Kahui", r: "wing", o: 83, alt: ["centre"] },

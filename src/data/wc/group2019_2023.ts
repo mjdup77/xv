@@ -31,7 +31,7 @@ export const WC_2019_2023: Squad[] = [
     { n: "Kieran Read", r: "number8", o: 88 },
     { n: "Aaron Smith", r: "scrumhalf", o: 89, s: { handling: 91 } },
     { n: "Richie Mo'unga", r: "flyhalf", o: 86, s: { goalKick: 90 } },
-    { n: "Beauden Barrett", r: "fullback", o: 89, alt: ["flyhalf"], s: { pace: 90 } },
+    { n: "Beauden Barrett", r: "flyhalf", o: 89, alt: ["fullback"], s: { pace: 90 } },
     { n: "Anton Lienert-Brown", r: "centre", o: 83 },
     { n: "Jack Goodhue", r: "centre", o: 83 },
     { n: "Sonny Bill Williams", r: "centre", o: 84 },

@@ -58,7 +58,7 @@ export const SQUADS: Squad[] = [
     { n: "Kieran Read", r: "number8", o: 90, s: { carry: 90, handling: 86, breakdown: 88 } },
     { n: "Aaron Smith", r: "scrumhalf", o: 89, s: { handling: 92, pace: 84 } },
     { n: "Dan Carter", r: "flyhalf", o: 94, s: { goalKick: 94, gameManage: 93, kick: 90, handling: 88 } },
-    { n: "Ma'a Nonu", r: "centre", o: 88, s: { carry: 90, defence: 86 } },
+    { n: "Ma'a Nonu", r: "centre", o: 90, s: { carry: 90, defence: 86 } },
     { n: "Conrad Smith", r: "centre", o: 86, s: { defence: 90, handling: 86 } },
     { n: "Julian Savea", r: "wing", o: 88, s: { pace: 88, carry: 90 } },
     { n: "Nehe Milner-Skudder", r: "wing", o: 84, s: { pace: 88, handling: 84 } },

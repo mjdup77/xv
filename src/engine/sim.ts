@@ -652,22 +652,35 @@ export function simH2H(
     tryScorers: aScorers,
   };
 
-  // Build a minute-by-minute reel of the scoring moments.
+  // Build a minute-by-minute reel of the scoring moments. The first `cons`
+  // tries on each side are the converted ones, so a try is worth 7 or 5.
   const raw: Omit<H2HMoment, "minute">[] = [];
   const hKicker = bestKicker(homeLineup);
   const aKicker = bestKicker(awayLineup);
-  hScorers.forEach((nm) =>
-    raw.push({ side: "home", kind: "try", text: `${nm} touches down for ${labels.home}` }),
-  );
-  aScorers.forEach((nm) =>
-    raw.push({ side: "away", kind: "try", text: `${nm} touches down for ${labels.away}` }),
-  );
+  hScorers.forEach((nm, i) => {
+    const conv = i < hCons;
+    raw.push({
+      side: "home",
+      kind: "try",
+      text: `${nm} touches down for ${labels.home}${conv ? " (converted)" : ""}`,
+      points: conv ? 7 : 5,
+    });
+  });
+  aScorers.forEach((nm, i) => {
+    const conv = i < aCons;
+    raw.push({
+      side: "away",
+      kind: "try",
+      text: `${nm} touches down for ${labels.away}${conv ? " (converted)" : ""}`,
+      points: conv ? 7 : 5,
+    });
+  });
   for (let i = 0; i < hPens; i++)
-    raw.push({ side: "home", kind: "pen", text: `${hKicker} slots a penalty` });
+    raw.push({ side: "home", kind: "pen", text: `${hKicker} slots a penalty`, points: 3 });
   for (let i = 0; i < aPens; i++)
-    raw.push({ side: "away", kind: "pen", text: `${aKicker} slots a penalty` });
-  if (hDrop) raw.push({ side: "home", kind: "drop", text: `${hKicker} drops a goal` });
-  if (aDrop) raw.push({ side: "away", kind: "drop", text: `${aKicker} drops a goal` });
+    raw.push({ side: "away", kind: "pen", text: `${aKicker} slots a penalty`, points: 3 });
+  if (hDrop) raw.push({ side: "home", kind: "drop", text: `${hKicker} drops a goal`, points: 3 });
+  if (aDrop) raw.push({ side: "away", kind: "drop", text: `${aKicker} drops a goal`, points: 3 });
 
   const minutes = rng
     .shuffle(Array.from({ length: 79 }, (_, i) => i + 1))
@@ -682,6 +695,7 @@ export function simH2H(
       side: homeWon ? "home" : "away",
       kind: "drop",
       text: `Golden point! ${homeWon ? labels.home : labels.away} land the match-winner`,
+      points: 3,
     });
 
   const motm = pickMotmH2H(homeLineup, awayLineup, home, away, homeWon, rng);
@@ -689,11 +703,11 @@ export function simH2H(
   const margin = Math.abs(hPts - aPts);
   const winner = homeWon ? labels.home : labels.away;
   let headline: string;
-  if (golden) headline = `${winner} steal it at the death!`;
-  else if (margin <= 5) headline = `${winner} edge a nerve-shredding classic`;
-  else if (margin >= 28) headline = `${winner} run riot`;
-  else if (margin >= 15) headline = `${winner} pull clear for a statement win`;
-  else headline = `${winner} prove a class apart`;
+  if (golden) headline = `${winner} steals it at the death!`;
+  else if (margin <= 5) headline = `${winner} edges a nerve-shredding classic`;
+  else if (margin >= 28) headline = `${winner} runs riot`;
+  else if (margin >= 15) headline = `${winner} pulls clear for a statement win`;
+  else headline = `${winner} proves a class apart`;
 
   return { home, away, homeWon, draw: false, motm, timeline, headline };
 }

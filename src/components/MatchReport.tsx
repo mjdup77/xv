@@ -2,11 +2,15 @@ import { useState } from "react";
 import type { H2HResult, Lineup } from "../types";
 import { Pitch } from "./Pitch";
 import { track } from "../analytics";
+import { shareOrCopy } from "../share";
 
 interface Props {
   result: H2HResult;
   homeLineup: Lineup;
-  challengeBackUrl: string;
+  record?: string;
+  prepareCombinedLink: () => Promise<string>;
+  prepareResultLink: () => Promise<string>;
+  onChallengeSent?: () => void;
   onRematch: () => void;
   onNewRun: () => void;
 }
@@ -41,39 +45,56 @@ function tryScorerLine(scorers: string[]): string {
 export function MatchReport({
   result,
   homeLineup,
-  challengeBackUrl,
+  record,
+  prepareCombinedLink,
+  prepareResultLink,
+  onChallengeSent,
   onRematch,
   onNewRun,
 }: Props) {
   const [shared, setShared] = useState(false);
+  const [sentResult, setSentResult] = useState(false);
   const { home, away, homeWon, motm } = result;
 
+  // Unified "Challenge a friend": one link where the recipient can play this XV
+  // head-to-head, or run the same draft settings solo.
   const share = async () => {
     const line = homeWon
-      ? `My XV won ${home.points}–${away.points} on XV 🏉. Draft your team and face mine!`
-      : `My XV lost ${home.points}–${away.points} — draft a team and take me on at XV 🏉.`;
-    const canNativeShare =
-      typeof navigator !== "undefined" && typeof navigator.share === "function";
-    track("match_share_clicked", {
-      method: canNativeShare ? "native" : "copy",
+      ? `My XV won ${home.points}–${away.points} on XV 🏉. Take on my team, or beat my draft!`
+      : `My XV lost ${home.points}–${away.points} on XV 🏉. Think you can do better? Take me on.`;
+    const url = await prepareCombinedLink();
+    const res = await shareOrCopy({
+      title: "XV — challenge a friend",
+      text: line,
+      url,
+    });
+    onChallengeSent?.();
+    track("combined_challenge_created", {
+      method: res,
+      from: "match",
+      has_score: false,
       home_won: homeWon,
       home_points: home.points,
       away_points: away.points,
     });
-    try {
-      if (canNativeShare) {
-        await navigator.share({ title: "XV — face my XV", text: line, url: challengeBackUrl });
-        return;
-      }
-    } catch {
-      // dismissed — fall through to copy
-    }
-    try {
-      await navigator.clipboard?.writeText(`${line}\n${challengeBackUrl}`);
+    if (res === "copied") {
       setShared(true);
       setTimeout(() => setShared(false), 2000);
-    } catch {
-      /* clipboard unavailable */
+    }
+  };
+
+  // Send the OTHER player a link that replays this exact match, so they see the
+  // same simulation and result instead of only hearing about it.
+  const shareResult = async () => {
+    const line = homeWon
+      ? `${home.label} beat ${away.label} ${home.points}–${away.points} on XV 🏉. Watch the match:`
+      : `${away.label} beat ${home.label} ${away.points}–${home.points} on XV 🏉. Watch the match:`;
+    const url = await prepareResultLink();
+    const res = await shareOrCopy({ title: "XV — match result", text: line, url });
+    track("match_result_shared", { method: res, home_won: homeWon });
+    if (res === "copied") {
+      setSentResult(true);
+      setTimeout(() => setSentResult(false), 2000);
     }
   };
 
@@ -91,6 +112,22 @@ export function MatchReport({
       </div>
 
       <div className="mr-headline">{result.headline}</div>
+      {record && (
+        <div className="mr-record">
+          Your head-to-head record: <b>{record}</b>
+        </div>
+      )}
+
+      <div className="mr-send mr-send-top">
+        <button className="btn primary big" onClick={shareResult}>
+          {sentResult ? "Link copied — now send it! ✅" : "📲 Send the result to your opponent"}
+        </button>
+        <p className="mr-send-note">
+          They watch the exact same 80 minutes — no re-draft needed. This is how
+          they find out you played.
+        </p>
+      </div>
+
       <div className="mr-motm">
         <span className="motm-tag">PLAYER OF THE MATCH</span> {motm.name}
         <span className="muted"> · {motm.team}</span>
@@ -149,16 +186,16 @@ export function MatchReport({
       </div>
 
       <div className="result-pitch">
-        <h3>Your XV</h3>
+        <h3>{result.home.label}</h3>
         <Pitch lineup={homeLineup} />
       </div>
 
       <div className="result-actions">
-        <button className="btn primary" onClick={onRematch}>
+        <button className="btn ghost" onClick={onRematch}>
           Rematch
         </button>
         <button className="btn ghost" onClick={share}>
-          {shared ? "Link copied!" : "Challenge a friend with your XV"}
+          {shared ? "Link copied — send it!" : "🏉 Challenge a friend"}
         </button>
         <button className="btn ghost" onClick={onNewRun}>
           New Run

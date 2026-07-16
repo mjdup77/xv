@@ -136,7 +136,7 @@ export function track(event: string, props: Props = {}) {
     ...context,
     props,
   };
-  if (import.meta.env.DEV) console.debug("[track]", event, props);
+  if (import.meta.env?.DEV) console.debug("[track]", event, props);
   mirror(e);
   queue.push(e);
   if (queue.length >= BATCH_MAX) flush();

@@ -126,6 +126,7 @@ export interface H2HMoment {
   side: "home" | "away";
   kind: "try" | "pen" | "drop";
   text: string;
+  points: number; // points this moment added to that side (lets the reel tick the score)
 }
 
 export interface H2HResult {

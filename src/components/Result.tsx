@@ -2,15 +2,15 @@ import { useState } from "react";
 import type { Lineup, TournamentResult } from "../types";
 import { Pitch } from "./Pitch";
 import { track } from "../analytics";
-import { challengeLink, type Challenge } from "../challenge";
+import { type Challenge } from "../challenge";
+import { shareOrCopy } from "../share";
+import { recordChallengeSent } from "../career";
 
 interface Props {
   result: TournamentResult;
   lineup: Lineup;
-  seed: string;
-  settings: { era: string; rating: string; diff: string };
   challenge?: Challenge | null;
-  matchUrl: string;
+  prepareCombinedLink: () => Promise<string>;
   streakNote?: string;
   onPlayAgain: () => void;
 }
@@ -31,10 +31,8 @@ function FacetBar({ label, value }: { label: string; value: number }) {
 export function Result({
   result,
   lineup,
-  seed,
-  settings,
   challenge,
-  matchUrl,
+  prepareCombinedLink,
   streakNote,
   onPlayAgain,
 }: Props) {
@@ -53,77 +51,33 @@ export function Result({
       : "Where it slipped";
 
   const [shared, setShared] = useState(false);
-  const [sharedMatch, setSharedMatch] = useState(false);
 
   // Beat-my-score comparison when this run was an accepted challenge.
   const beat = challenge ? result.perfectScore - challenge.score : null;
 
-  const shareMatch = async () => {
-    const line = result.champion
-      ? `I won the Rugby World Cup on XV 🏉 — now draft your own XV and face mine over 80 minutes.`
-      : `I drafted an XV on XV 🏉 — draft yours and let's settle it over 80 minutes.`;
-    const canNativeShare =
-      typeof navigator !== "undefined" && typeof navigator.share === "function";
-    track("match_share_clicked", { method: canNativeShare ? "native" : "copy", from: "result" });
-    try {
-      if (canNativeShare) {
-        await navigator.share({ title: "XV — face my XV", text: line, url: matchUrl });
-        return;
-      }
-    } catch {
-      /* dismissed — fall through to copy */
-    }
-    try {
-      await navigator.clipboard?.writeText(`${line}\n${matchUrl}`);
-      setSharedMatch(true);
-      setTimeout(() => setSharedMatch(false), 2000);
-    } catch {
-      /* clipboard unavailable */
-    }
-  };
-
+  // One unified "Challenge a friend" link: it carries both this exact draft
+  // (to beat the score) AND this XV (to play head-to-head). The recipient picks.
   const share = async () => {
     const headline = result.perfect35
-      ? `I built the PERFECT 35 on XV 🏉🏆 — beat that if you can.`
+      ? `I built the PERFECT 35 on XV 🏉🏆`
       : result.champion
-        ? `I won the Rugby World Cup on XV 🏉 with ${result.perfectScore}/35.`
-        : `I scored ${result.perfectScore}/35 on XV 🏉.`;
-    const line = `${headline} Same draft — can you beat me?`;
-    const link = challengeLink({
-      seed,
-      era: settings.era,
-      rating: settings.rating,
-      diff: settings.diff,
-      score: result.perfectScore,
-      verdict: result.verdict,
-      champion: result.champion,
-    });
-    const text = `${line}\n${link}`;
-
-    const canNativeShare =
-      typeof navigator !== "undefined" && typeof navigator.share === "function";
-    track("share_clicked", {
-      method: canNativeShare ? "native" : "copy",
+        ? `I won the Rugby World Cup on XV 🏉 with ${result.perfectScore}/35`
+        : `I scored ${result.perfectScore}/35 on XV 🏉`;
+    const line = `${headline} — beat my score, or take on my XV head-to-head.`;
+    const url = await prepareCombinedLink();
+    const res = await shareOrCopy({ title: "XV — challenge a friend", text: line, url });
+    recordChallengeSent();
+    track("combined_challenge_created", {
+      from: "result",
+      method: res,
       champion: result.champion,
       perfect35: result.perfect35,
+      has_score: true,
       perfect_score: result.perfectScore,
-      is_challenge: true,
     });
-
-    try {
-      if (canNativeShare) {
-        await navigator.share({ title: "XV — beat my draft", text: line, url: link });
-        return;
-      }
-    } catch {
-      // User dismissed the share sheet, or it failed — fall back to copy.
-    }
-    try {
-      await navigator.clipboard?.writeText(text);
+    if (res === "copied") {
       setShared(true);
       setTimeout(() => setShared(false), 2000);
-    } catch {
-      /* clipboard unavailable */
     }
   };
 
@@ -260,20 +214,17 @@ export function Result({
           {result.perfect35
             ? "🏉 The Perfect 35 — surely unbeatable. Dare a mate to try."
             : result.champion
-              ? `🏉 World Cup won with ${result.perfectScore}/35 — challenge a mate to top it.`
-              : `🏉 You scored ${result.perfectScore}/35 — challenge a mate to beat it.`}
+              ? `🏉 World Cup won with ${result.perfectScore}/35 — challenge a mate.`
+              : `🏉 You scored ${result.perfectScore}/35 — challenge a mate.`}
         </div>
         <div className="share-prompt-actions">
-          <button className="btn primary" onClick={share}>
-            {shared ? "Link copied!" : "Beat my score"}
-          </button>
-          <button className="btn primary" onClick={shareMatch}>
-            {sharedMatch ? "Link copied!" : "⚔️ Play my XV (head-to-head)"}
+          <button className="btn primary big" onClick={share}>
+            {shared ? "Link copied — now send it!" : "🏉 Challenge a friend"}
           </button>
         </div>
         <div className="share-prompt-sub muted">
-          “Beat my score” = same draft, your shot at a higher total. “Play my XV”
-          = they draft their own team and the two sides play a match.
+          One link — your mate chooses: <b>beat your score</b> on the same draft,
+          or <b>play your XV</b> in an 80-minute head-to-head.
         </div>
       </div>
 
